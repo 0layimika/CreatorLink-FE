@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
-export default function VerifyPage() {
+function VerifyPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -29,6 +29,21 @@ export default function VerifyPage() {
         <p className="text-text-secondary">Please wait while we redirect you to the verification page.</p>
       </Card>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
+        <Card className="p-8 max-w-md w-full text-center shadow-medium">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">Loading...</h2>
+        </Card>
+      </div>
+    }>
+      <VerifyPageContent />
+    </Suspense>
   );
 }
 

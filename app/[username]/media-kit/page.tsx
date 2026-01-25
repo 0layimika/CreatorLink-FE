@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: MediaKitPageProps) {
   const profile = await getProfile(username);
   
   const name = profile
-    ? `${profile.firstname} ${profile.lastname}`.trim() || profile.username
+    ? `${profile.first_name} ${profile.last_name}`.trim() || profile.username
     : username;
   
   return {
@@ -59,7 +59,7 @@ export default async function PublicMediaKitPage({ params }: MediaKitPageProps) 
 
   const user = {
     id: profile.id,
-    name: `${profile.firstname} ${profile.lastname}`.trim() || profile.username,
+    name: `${profile.first_name} ${profile.last_name}`.trim() || profile.username,
     username: profile.username,
     email: '',
     bio: profile.bio || '',
