@@ -211,7 +211,7 @@ export default function SettingsPage() {
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               placeholder="yourname"
-              helperText={`Your public profile URL: linkverse.com/${formData.username || 'yourname'}`}
+              helperText={`Your public profile URL: https://www.linkverse.live/${formData.username || 'yourname'}`}
             />
 
             {/* Name Fields */}

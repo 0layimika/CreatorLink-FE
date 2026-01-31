@@ -75,37 +75,54 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     createdAt: new Date().toISOString(),
   };
 
-  const links = profile.links.map((link) => ({
+  const links = profile.links.map((link: any) => ({
     id: link.id,
     title: link.title,
     url: link.url,
     icon: link.icon || 'Link',
+    thumbnail_url: link.thumbnail_url ?? null,
     clicks: 0,
     enabled: true,
     order: 0,
   }));
 
+  const profileConfig = profile.profile_config;
+  const bgStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    ...(profileConfig?.background_type === 'image' && profileConfig?.background_value
+      ? {
+          backgroundImage: `url(${profileConfig.background_value})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }
+      : {
+          backgroundColor: profileConfig?.background_value || '#faf9f7',
+        }),
+    color: profileConfig?.text_color || '#1a1a1a',
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div style={bgStyle}>
       <div className="max-w-lg mx-auto px-4 py-12">
-        <ProfileHeader user={user} />
+        <ProfileHeader user={user} textColor={profileConfig?.text_color || undefined} />
 
         <div className="mt-8 space-y-4">
           {links.map((link) => (
-            <LinkButton key={link.id} link={link} />
+            <LinkButton key={link.id} link={link} textColor={profileConfig?.text_color || undefined} />
           ))}
         </div>
 
         {links.length === 0 && (
-          <div className="mt-8 text-center">
-            <p className="text-text-secondary">
-              No links added yet.
-            </p>
+          <div className="mt-8 text-center opacity-70">
+            <p>No links added yet.</p>
           </div>
         )}
 
         <div className="mt-8 flex flex-col items-center space-y-4">
-          <SupportButton username={username} />
+          <SupportButton
+            username={username}
+            buttonText={profileConfig?.support_button_text || 'Support me'}
+          />
 
           {/* Media Kit link commented out - coming soon */}
           {/* <Link href={`/${username}/media-kit`}>
@@ -117,9 +134,9 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
         </div>
 
         <div className="mt-12 text-center">
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs opacity-70">
             Powered by{' '}
-            <Link href="/" className="text-primary hover:underline">
+            <Link href="/" className="underline hover:opacity-90" style={{ color: 'inherit' }}>
               {siteConfig.name}
             </Link>
           </p>

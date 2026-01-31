@@ -8,8 +8,8 @@ interface UseLinksReturn {
   links: Link[];
   isLoading: boolean;
   error: string | null;
-  createLink: (data: { title: string; url: string; icon?: string }) => Promise<void>;
-  updateLink: (id: number, data: { title?: string; url?: string; icon?: string }) => Promise<void>;
+  createLink: (data: { title: string; url: string; icon?: string; thumbnail_url?: string | null }) => Promise<void>;
+  updateLink: (id: number, data: { title?: string; url?: string; icon?: string; thumbnail_url?: string | null }) => Promise<void>;
   deleteLink: (id: number) => Promise<void>;
   toggleLink: (id: number, enabled: boolean) => Promise<void>;
   reorderLinks: (linkIds: number[]) => Promise<void>;
@@ -27,12 +27,13 @@ export function useLinks(): UseLinksReturn {
     try {
       const response = await linksApi.getAll();
       if (response.success && response.data) {
-        const mappedLinks: Link[] = response.data.map((link) => ({
+        const mappedLinks: Link[] = response.data.map((link: any) => ({
           id: link.id.toString(),
           title: link.title,
           url: link.url,
           icon: link.icon || 'Link',
-          clicks: link.clicks ?? 0, // Default to 0 if null/undefined
+          thumbnail_url: link.thumbnail_url ?? null,
+          clicks: link.clicks ?? 0,
           enabled: link.is_active,
           order: link.position,
         }));
@@ -49,7 +50,7 @@ export function useLinks(): UseLinksReturn {
     fetchLinks();
   }, [fetchLinks]);
 
-  const createLink = useCallback(async (data: { title: string; url: string; icon?: string }) => {
+  const createLink = useCallback(async (data: { title: string; url: string; icon?: string; thumbnail_url?: string | null }) => {
     const response = await linksApi.create(data);
     if (response.success) {
       await fetchLinks();
@@ -58,7 +59,7 @@ export function useLinks(): UseLinksReturn {
     }
   }, [fetchLinks]);
 
-  const updateLink = useCallback(async (id: number, data: { title?: string; url?: string; icon?: string }) => {
+  const updateLink = useCallback(async (id: number, data: { title?: string; url?: string; icon?: string; thumbnail_url?: string | null }) => {
     const response = await linksApi.update(id, data);
     if (response.success) {
       await fetchLinks();

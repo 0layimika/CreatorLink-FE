@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.linkverse.live/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.linkverse.live/api/v1';
 
 interface ApiResponse<T = unknown> {
     success: boolean;
@@ -165,10 +165,10 @@ export const linksApi = {
         position: number;
     }>>('/links'),
 
-    create: (data: { title: string; url: string; icon?: string }) =>
+    create: (data: { title: string; url: string; icon?: string; thumbnail_url?: string | null }) =>
         api.post('/links', data),
 
-    update: (id: number, data: { title?: string; url?: string; icon?: string; position?: number }) =>
+    update: (id: number, data: { title?: string; url?: string; icon?: string; thumbnail_url?: string | null; position?: number }) =>
         api.patch(`/links/${id}`, data),
 
     delete: (id: number) =>
@@ -280,13 +280,34 @@ export const profileApi = {
             last_name: string;
             bio: string;
             avatar_url: string;
+            profile_config: {
+                background_type: string;
+                background_value: string | null;
+                text_color: string | null;
+                support_button_text?: string | null;
+            } | null;
             links: Array<{
                 id: string;
                 title: string;
                 url: string;
                 icon: string;
+                thumbnail_url?: string | null;
             }>;
         }>(`/profile/${username}`),
+
+    getProfileConfig: () => api.get<{
+        background_type: string;
+        background_value: string | null;
+        text_color: string | null;
+        support_button_text?: string | null;
+    }>('/profile/config'),
+
+    updateProfileConfig: (data: {
+        background_type?: 'color' | 'image';
+        background_value?: string | null;
+        text_color?: string | null;
+        support_button_text?: string | null;
+    }) => api.patch('/profile/config', data),
 };
 
 // Media API

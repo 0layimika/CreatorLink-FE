@@ -2,7 +2,7 @@
 
 import { GripVertical, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { Link } from '@/types';
 
 interface LinkItemProps {
@@ -40,9 +40,6 @@ export function LinkItem({ link, onEdit, onDelete, onToggle }: LinkItemProps) {
             </a>
           </div>
           <p className="text-sm text-text-secondary truncate">{link.url}</p>
-          <p className="text-xs text-text-secondary mt-1">
-            {formatNumber(link.clicks)} clicks
-          </p>
         </div>
 
         <div className="flex items-center space-x-2">

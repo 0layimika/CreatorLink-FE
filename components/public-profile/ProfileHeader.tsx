@@ -4,11 +4,14 @@ import type { User } from '@/types';
 
 interface ProfileHeaderProps {
   user: User;
+  textColor?: string;
 }
 
-export function ProfileHeader({ user }: ProfileHeaderProps) {
+export function ProfileHeader({ user, textColor }: ProfileHeaderProps) {
+  const style = textColor ? { color: textColor } : undefined;
+  const mutedStyle = textColor ? { color: `${textColor}CC` } : undefined;
   return (
-    <div className="text-center">
+    <div className="text-center" style={style}>
       <div className="flex justify-center mb-4">
         <div className="relative">
           <Avatar src={user.avatar} size="xl" className="h-24 w-24 text-2xl shadow-medium" />
@@ -19,10 +22,10 @@ export function ProfileHeader({ user }: ProfileHeaderProps) {
           )}
         </div>
       </div>
-      <h1 className="text-2xl font-bold text-foreground">{user.name}</h1>
-      <p className="text-text-secondary">@{user.username}</p>
+      <h1 className="text-2xl font-bold">{user.name}</h1>
+      <p style={textColor ? mutedStyle : undefined} className={!textColor ? 'text-text-secondary' : ''}>@{user.username}</p>
       {user.bio && (
-        <p className="text-sm text-text-secondary mt-3 max-w-md mx-auto">
+        <p className={`text-sm mt-3 max-w-md mx-auto ${!textColor ? 'text-text-secondary' : ''}`} style={textColor ? mutedStyle : undefined}>
           {user.bio}
         </p>
       )}

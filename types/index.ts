@@ -14,9 +14,17 @@ export interface Link {
   title: string;
   url: string;
   icon: string;
+  thumbnail_url?: string | null;
   clicks: number;
   enabled: boolean;
   order: number;
+}
+
+export interface ProfileConfig {
+  background_type: 'color' | 'image';
+  background_value: string | null;
+  text_color: string | null;
+  support_button_text?: string | null;
 }
 
 export interface Stats {

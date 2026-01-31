@@ -9,6 +9,7 @@ import { WithdrawModal } from '@/components/dashboard/WithdrawModal';
 import { TransactionTable } from '@/components/dashboard/TransactionTable';
 import { useWallet } from '@/hooks/useWallet';
 import { formatCurrency } from '@/lib/utils';
+import {giftApi} from "@/lib/api";
 
 export default function WalletPage() {
   const { wallet, transactions, banks, bankAccount, isLoading, setBankAccount, resolveAccount, withdraw } = useWallet();

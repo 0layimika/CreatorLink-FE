@@ -8,9 +8,10 @@ import { giftApi } from '@/lib/api';
 
 interface SupportButtonProps {
   username: string;
+  buttonText?: string;
 }
 
-export function SupportButton({ username }: SupportButtonProps) {
+export function SupportButton({ username, buttonText = 'Support me' }: SupportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [senderName, setSenderName] = useState('');
@@ -61,7 +62,7 @@ export function SupportButton({ username }: SupportButtonProps) {
         className="bg-gradient-primary text-white shadow-soft hover:shadow-medium"
       >
         <Heart className="h-4 w-4 mr-2" />
-        Support me
+        {buttonText}
       </Button>
 
       {isOpen && (

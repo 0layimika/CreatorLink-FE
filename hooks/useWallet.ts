@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { walletApi } from '@/lib/api';
+import { walletApi, giftApi } from '@/lib/api';
 
 interface WalletData {
     balance: number;
@@ -86,6 +86,46 @@ export function useWallet(): UseWalletReturn {
                     sender_email: t.sender_email || undefined,
                 }));
                 setTransactions(mappedTransactions);
+
+                // Verify all pending gift/tip transactions
+                const pendingGifts = mappedTransactions.filter(
+                    (t) => t.status === 'pending' && t.type === 'tip' && t.reference
+                );
+                let anyCompleted = false;
+                for (const t of pendingGifts) {
+                    try {
+                        const verifyRes = await giftApi.verifyGift(t.reference!);
+                        if (verifyRes.success && verifyRes.data?.status === 'completed') {
+                            anyCompleted = true;
+                        }
+                    } catch {
+                        // Silently ignore verify errors
+                    }
+                }
+                if (anyCompleted) {
+                    // Refetch wallet and transactions
+                    const [refetchWallet, refetchTx] = await Promise.all([
+                        walletApi.getBalance(),
+                        walletApi.getTransactions({ limit: 10 }),
+                    ]);
+                    if (refetchWallet.success && refetchWallet.data) {
+                        setWallet(refetchWallet.data);
+                    }
+                    if (refetchTx.success && refetchTx.data && Array.isArray(refetchTx.data)) {
+                        setTransactions(refetchTx.data.map((t: any) => ({
+                            id: t.id.toString(),
+                            type: t.type === 'gift' ? 'tip' : (t.type === 'withdrawal' ? 'withdrawal' : 'payment'),
+                            amount: typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount,
+                            currency: t.currency,
+                            description: t.description || '',
+                            status: t.status as 'completed' | 'pending' | 'failed',
+                            createdAt: t.created_at,
+                            reference: t.reference,
+                            sender_name: t.sender_name || undefined,
+                            sender_email: t.sender_email || undefined,
+                        })));
+                    }
+                }
             } else {
                 setTransactions([]);
             }
