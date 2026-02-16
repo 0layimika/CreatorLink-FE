@@ -418,6 +418,7 @@ export const storeApi = {
         const query = queryParams.toString();
         return api.get(`/store/orders${query ? `?${query}` : ''}`);
     },
+    resendOrderEmail: (orderId: number) => api.post(`/store/orders/${orderId}/resend-email`),
 
     listBookings: (params?: { limit?: number; offset?: number }) => {
         const queryParams = new URLSearchParams();
@@ -440,7 +441,8 @@ export const storeApi = {
         buyer_name?: string;
         buyer_phone?: string;
         delivery_address?: Record<string, any> | null;
-        booking_id?: number;
+        slot_start?: string;
+        slot_end?: string;
     }) => api.post(`/store/${username}/buy/${productId}`, data),
 
     verifyPurchase: (reference: string) =>
