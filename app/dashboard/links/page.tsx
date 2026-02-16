@@ -12,10 +12,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLinks } from '@/hooks/useLinks';
 import { useProfileConfig } from '@/hooks/useProfileConfig';
 import { mediaApi } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 import type { Link } from '@/types';
 
 export default function LinksPage() {
   const { user, creator, updateCreator } = useAuth();
+  const { addToast } = useToast();
   const { links, isLoading, createLink, updateLink, toggleLink, deleteLink } = useLinks();
   const { config: profileConfig, updateConfig: updateProfileConfig } = useProfileConfig();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,8 +92,10 @@ export default function LinksPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
+      addToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
     } finally {
       setAvatarUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -129,8 +133,10 @@ export default function LinksPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
+      addToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
     } finally {
       setBgImageUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -160,6 +166,7 @@ export default function LinksPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
+      addToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
     } finally {
       setThumbnailUploading(null);
     }

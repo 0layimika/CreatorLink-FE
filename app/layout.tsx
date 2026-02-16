@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Libre_Baskerville, Source_Sans_3 } from 'next/font/google';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AppProviders } from '@/components/providers/AppProviders';
 import './globals.css';
 
 const libreBaskerville = Libre_Baskerville({
@@ -34,9 +34,9 @@ export default function RootLayout({
       <body
         className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
       >
-        <AuthProvider>
+        <AppProviders>
           {children}
-        </AuthProvider>
+        </AppProviders>
       </body>
     </html>
   );

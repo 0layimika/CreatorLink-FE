@@ -17,6 +17,14 @@ class ApiClient {
         this.baseUrl = baseUrl;
     }
 
+    private handleUnauthorized(): void {
+        if (typeof window === 'undefined') return;
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('creator');
+        window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'expired' } }));
+    }
+
     private getAuthHeader(): Record<string, string> {
         if (typeof window === 'undefined') return {};
         const token = localStorage.getItem('auth_token');
@@ -46,6 +54,10 @@ class ApiClient {
                 headers,
             });
 
+            if (response.status === 401) {
+                this.handleUnauthorized();
+            }
+
             let data;
             try {
                 data = await response.json();
@@ -70,6 +82,10 @@ class ApiClient {
                     }
                 } else if (data.message) {
                     errorMessage = data.message;
+                }
+
+                if (response.status === 401) {
+                    throw new Error('Your session has expired. Please log in again.');
                 }
 
                 throw new Error(errorMessage);
@@ -346,4 +362,109 @@ export const giftApi = {
         api.get<{
             status: 'completed' | 'pending' | 'failed';
         }>(`/gift/verify?reference=${reference}`),
+};
+
+// Store API
+export const storeApi = {
+    createProduct: (data: {
+        type: 'digital' | 'physical' | 'service';
+        title: string;
+        description?: string | null;
+        price: number;
+        currency?: string;
+        cover_url?: string | null;
+        is_active?: boolean;
+        download_limit?: number;
+        file_id?: string | null;
+        file_url?: string | null;
+        file_size?: number | null;
+        file_type?: string | null;
+        duration_minutes?: number | null;
+        buffer_minutes?: number | null;
+        timezone?: string | null;
+        requires_address?: boolean;
+    }) => api.post('/store/products', data),
+
+    updateProduct: (id: number, data: Partial<{
+        title: string;
+        description?: string | null;
+        price: number;
+        currency?: string;
+        cover_url?: string | null;
+        is_active?: boolean;
+        download_limit?: number;
+        file_id?: string | null;
+        file_url?: string | null;
+        file_size?: number | null;
+        file_type?: string | null;
+        duration_minutes?: number | null;
+        buffer_minutes?: number | null;
+        timezone?: string | null;
+        requires_address?: boolean;
+    }>) => api.patch(`/store/products/${id}`, data),
+
+    listMyProducts: (params?: { limit?: number; offset?: number }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.offset) queryParams.append('offset', params.offset.toString());
+        const query = queryParams.toString();
+        return api.get(`/store/products${query ? `?${query}` : ''}`);
+    },
+
+    listOrders: (params?: { limit?: number; offset?: number }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.offset) queryParams.append('offset', params.offset.toString());
+        const query = queryParams.toString();
+        return api.get(`/store/orders${query ? `?${query}` : ''}`);
+    },
+
+    listBookings: (params?: { limit?: number; offset?: number }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.offset) queryParams.append('offset', params.offset.toString());
+        const query = queryParams.toString();
+        return api.get(`/store/bookings${query ? `?${query}` : ''}`);
+    },
+
+    getStorefront: (username: string, params?: { limit?: number; offset?: number }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.offset) queryParams.append('offset', params.offset.toString());
+        const query = queryParams.toString();
+        return api.get(`/store/${username}${query ? `?${query}` : ''}`);
+    },
+
+    initiatePurchase: (username: string, productId: number, data: {
+        buyer_email: string;
+        buyer_name?: string;
+        buyer_phone?: string;
+        delivery_address?: Record<string, any> | null;
+        booking_id?: number;
+    }) => api.post(`/store/${username}/buy/${productId}`, data),
+
+    verifyPurchase: (reference: string) =>
+        api.get(`/store/verify?reference=${reference}`),
+
+    getOrder: (reference: string) =>
+        api.get(`/store/order?reference=${reference}`),
+
+    download: (token: string) => api.get(`/store/download/${token}`),
+
+    listServiceSlots: (username: string, serviceId: number, params: { from: string; to: string }) =>
+        api.get(`/store/${username}/services/${serviceId}/slots?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`),
+
+    holdServiceSlot: (username: string, serviceId: number, data: {
+        slot_start: string;
+        slot_end: string;
+        buyer_email?: string;
+        buyer_name?: string;
+        buyer_phone?: string;
+        notes?: string;
+    }) => api.post(`/store/${username}/services/${serviceId}/hold`, data),
+
+    listAvailability: () => api.get('/store/availability'),
+
+    createAvailability: (data: { weekday: number; start_time: string; end_time: string; timezone: string }) =>
+        api.post('/store/availability', data),
 };

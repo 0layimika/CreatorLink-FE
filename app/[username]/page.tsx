@@ -5,7 +5,7 @@ import { LinkButton } from '@/components/public-profile/LinkButton';
 import { SupportButton } from '@/components/public-profile/SupportButton';
 import { Button } from '@/components/ui/Button';
 import { siteConfig } from '@/lib/constants';
-import { profileApi, analyticsApi } from '@/lib/api';
+import { profileApi, analyticsApi, storeApi } from '@/lib/api';
 
 interface PublicProfilePageProps {
   params: Promise<{ username: string }>;
@@ -16,6 +16,18 @@ async function getProfile(username: string) {
     const response = await profileApi.getPublicProfile(username);
     if (response.success && response.data) {
       return response.data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function getStore(username: string) {
+  try {
+    const response = await storeApi.getStorefront(username);
+    if (response.success && response.data) {
+      return response.data as any;
     }
     return null;
   } catch {
@@ -40,6 +52,7 @@ export async function generateMetadata({ params }: PublicProfilePageProps) {
 export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
   const { username } = await params;
   const profile = await getProfile(username);
+  const store = await getStore(username);
 
   // Track profile view (fire and forget)
   try {
@@ -101,10 +114,16 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     color: profileConfig?.text_color || '#1a1a1a',
   };
 
+  const storeUrl = store?.products?.length ? `/${username}/store` : null;
+
   return (
     <div style={bgStyle}>
       <div className="max-w-lg mx-auto px-4 py-12">
-        <ProfileHeader user={user} textColor={profileConfig?.text_color || undefined} />
+        <ProfileHeader
+          user={user}
+          textColor={profileConfig?.text_color || undefined}
+          storeUrl={storeUrl}
+        />
 
         <div className="mt-8 space-y-4">
           {links.map((link) => (

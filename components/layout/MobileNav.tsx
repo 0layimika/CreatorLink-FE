@@ -12,6 +12,7 @@ import {
   BarChart3,
   Wallet,
   FileText,
+  ShoppingBag,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const navItems = [
   { name: 'Links', href: '/dashboard/links', icon: LinkIcon },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
+  { name: 'Store', href: '/dashboard/store', icon: ShoppingBag },
   { name: 'Media Kit', href: '/dashboard/media-kit', icon: FileText },
 ];
 

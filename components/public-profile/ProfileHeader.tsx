@@ -1,13 +1,14 @@
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, ShoppingBag } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import type { User } from '@/types';
 
 interface ProfileHeaderProps {
   user: User;
   textColor?: string;
+  storeUrl?: string | null;
 }
 
-export function ProfileHeader({ user, textColor }: ProfileHeaderProps) {
+export function ProfileHeader({ user, textColor, storeUrl }: ProfileHeaderProps) {
   const style = textColor ? { color: textColor } : undefined;
   const mutedStyle = textColor ? { color: `${textColor}CC` } : undefined;
   return (
@@ -23,7 +24,21 @@ export function ProfileHeader({ user, textColor }: ProfileHeaderProps) {
         </div>
       </div>
       <h1 className="text-2xl font-bold">{user.name}</h1>
-      <p style={textColor ? mutedStyle : undefined} className={!textColor ? 'text-text-secondary' : ''}>@{user.username}</p>
+      <div className="flex items-center justify-center gap-2">
+        <p style={textColor ? mutedStyle : undefined} className={!textColor ? 'text-text-secondary' : ''}>
+          @{user.username}
+        </p>
+        {storeUrl && (
+          <a
+            href={storeUrl}
+            className="inline-flex items-center text-xs px-2 py-1 rounded-full border border-border bg-card/70 shadow-soft"
+            style={textColor ? mutedStyle : undefined}
+          >
+            <ShoppingBag className="h-3 w-3 mr-1" />
+            Store
+          </a>
+        )}
+      </div>
       {user.bio && (
         <p className={`text-sm mt-3 max-w-md mx-auto ${!textColor ? 'text-text-secondary' : ''}`} style={textColor ? mutedStyle : undefined}>
           {user.bio}

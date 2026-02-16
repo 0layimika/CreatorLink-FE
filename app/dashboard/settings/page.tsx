@@ -8,9 +8,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { mediaApi } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function SettingsPage() {
   const { user, creator, updateCreator, isLoading: authLoading } = useAuth();
+  const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -58,8 +60,10 @@ export default function SettingsPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
+      addToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 

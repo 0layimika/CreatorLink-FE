@@ -82,6 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
     }, []);
 
+    // Listen for global auth expiration/logout events
+    useEffect(() => {
+        const handleLogout = () => {
+            setUser(null);
+            setCreator(null);
+            router.push('/login');
+        };
+
+        window.addEventListener('auth:logout', handleLogout as EventListener);
+        return () => {
+            window.removeEventListener('auth:logout', handleLogout as EventListener);
+        };
+    }, [router]);
+
     const login = useCallback(async (email: string, password: string) => {
         setIsLoading(true);
         try {
