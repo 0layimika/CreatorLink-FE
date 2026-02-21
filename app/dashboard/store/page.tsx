@@ -890,38 +890,42 @@ export default function StoreDashboardPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 text-[11px] text-white/80">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                    <div key={day} className="text-center py-1">{day}</div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {ownerBlockMonthGrid.map((cell) => {
-                    const available = ownerBlockAvailableDays.includes(cell.key);
-                    const selected = ownerBlockSelectedDay === cell.key;
-                    return (
-                      <button
-                        key={`${cell.key}-${cell.inMonth ? 'm' : 'o'}`}
-                        type="button"
-                        disabled={!available}
-                        onClick={() => {
-                          setOwnerBlockSelectedDay(cell.key);
-                          setOwnerBlockSelectedSlot(null);
-                        }}
-                        className={`h-9 rounded-lg border text-xs font-semibold ${
-                          !cell.inMonth
-                            ? 'border-transparent text-white/35'
-                            : available
-                              ? selected
-                                ? 'border-primary bg-primary text-white'
-                                : 'border-border bg-background text-white hover:border-primary/60'
-                              : 'border-border/40 text-white/55 cursor-not-allowed'
-                        }`}
-                      >
-                        {cell.date.getDate()}
-                      </button>
-                    );
-                  })}
+                <div className="overflow-x-auto">
+                  <div className="min-w-[20.5rem] space-y-1">
+                    <div className="grid grid-cols-7 gap-1 text-[11px] text-white/80">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                        <div key={day} className="text-center py-1">{day}</div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {ownerBlockMonthGrid.map((cell) => {
+                        const available = ownerBlockAvailableDays.includes(cell.key);
+                        const selected = ownerBlockSelectedDay === cell.key;
+                        return (
+                          <button
+                            key={`${cell.key}-${cell.inMonth ? 'm' : 'o'}`}
+                            type="button"
+                            disabled={!available}
+                            onClick={() => {
+                              setOwnerBlockSelectedDay(cell.key);
+                              setOwnerBlockSelectedSlot(null);
+                            }}
+                            className={`h-10 rounded-lg border text-sm font-semibold ${
+                              !cell.inMonth
+                                ? 'border-transparent text-white/35'
+                                : available
+                                  ? selected
+                                    ? 'border-primary bg-primary text-white'
+                                    : 'border-border bg-background text-white hover:border-primary/60'
+                                  : 'border-border/40 text-white/55 cursor-not-allowed'
+                            }`}
+                          >
+                            {cell.date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -931,7 +935,7 @@ export default function StoreDashboardPage() {
                       : 'Select an available day'}
                   </p>
                   {ownerBlockSelectedDay && ownerBlockTimesForDay.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {ownerBlockTimesForDay.map((slot) => (
                         <button
                           key={slot.start}
