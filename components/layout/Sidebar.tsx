@@ -40,7 +40,7 @@ export function Sidebar() {
     : 'Creator';
 
   return (
-    <div className="flex flex-col h-full bg-card border-r border-border shadow-soft">
+    <div className="flex flex-col h-full bg-card/80 backdrop-blur-md border-r border-border shadow-soft">
       <div className="p-6">
         <Link href="/" className="flex items-center space-x-2">
           <Image
@@ -50,7 +50,7 @@ export function Sidebar() {
             height={36}
             className="rounded-lg"
           />
-          <span className="text-xl font-bold text-foreground">
+          <span className="font-display text-xl font-bold text-foreground">
             {siteConfig.name}
           </span>
         </Link>
@@ -69,7 +69,7 @@ export function Sidebar() {
                 'flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all',
                 isActive
                   ? 'bg-gradient-primary text-white shadow-soft'
-                  : 'text-text-secondary hover:bg-muted hover:text-foreground'
+                  : 'text-text-secondary hover:bg-muted/80 hover:text-foreground'
               )}
             >
               <Icon className="h-5 w-5" />
@@ -87,7 +87,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-muted hover:text-foreground transition-colors"
+              className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-muted/80 hover:text-foreground transition-colors"
             >
               <Icon className="h-5 w-5" />
               <span className="font-medium">{item.name}</span>

@@ -102,15 +102,12 @@ function ResetPasswordContent() {
       <div className="text-center mb-8">
         <Link href="/" className="inline-flex items-center space-x-2">
           <Image
-            src={siteConfig.logo}
+            src={siteConfig.logoWordmark}
             alt={siteConfig.name}
-            width={40}
+            width={168}
             height={40}
-            className="rounded-lg"
+            className="h-9 w-auto"
           />
-          <span className="text-2xl font-bold text-foreground">
-            {siteConfig.name}
-          </span>
         </Link>
         <h1 className="mt-6 text-2xl font-bold text-foreground">
           Reset your password

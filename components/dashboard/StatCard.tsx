@@ -21,11 +21,11 @@ export function StatCard({
   const isNegative = change && change < 0;
 
   return (
-    <Card className="p-6 shadow-soft hover:shadow-medium transition-shadow">
+    <Card className="p-6 hover:shadow-medium transition-shadow">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-text-secondary">{title}</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+          <p className="font-display text-2xl font-bold text-foreground mt-1">{value}</p>
           {change !== undefined && change !== 0 && (
             <div
               className={cn(

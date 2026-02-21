@@ -1,7 +1,7 @@
 import { type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
-export interface CardProps extends HTMLAttributes<HTMLDivElement> {}
+export type CardProps = HTMLAttributes<HTMLDivElement>;
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className, ...props }, ref) => {
@@ -9,7 +9,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          'rounded-xl bg-card border border-border p-6',
+          'rounded-2xl surface-panel p-6 shadow-soft',
           className
         )}
         {...props}

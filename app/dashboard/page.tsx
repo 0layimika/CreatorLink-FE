@@ -124,10 +124,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="font-display text-3xl font-bold text-foreground">
             Welcome back, {firstName}
           </h1>
           <p className="text-text-secondary mt-1">
@@ -141,13 +141,13 @@ export default function DashboardPage() {
                 type="text"
                 readOnly
                 value={publicPageUrl}
-                className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg bg-muted border border-border text-foreground truncate"
+                className="flex-1 min-w-0 px-3 py-2 text-sm rounded-xl bg-card border border-border text-foreground truncate"
               />
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopyLink}
-                className="shrink-0 shadow-soft"
+                className="shrink-0"
               >
                 <Copy className="h-4 w-4 mr-2" />
                 {copied ? 'Copied!' : 'Copy'}
@@ -157,7 +157,7 @@ export default function DashboardPage() {
                 size="sm"
                 onClick={handleDownloadQR}
                 disabled={qrLoading}
-                className="shrink-0 shadow-soft"
+                className="shrink-0"
               >
                 {qrLoading ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -196,9 +196,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-soft">
+        <Card>
           <CardHeader>
-            <CardTitle>Top Links</CardTitle>
+            <CardTitle className="font-display">Top Links</CardTitle>
           </CardHeader>
           <CardContent>
             {links.length > 0 ? (

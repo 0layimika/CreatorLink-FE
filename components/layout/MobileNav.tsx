@@ -41,7 +41,7 @@ export function MobileNav() {
 
   return (
     <>
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-soft">
+      <div className="bg-card/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between shadow-soft">
         <Link href="/" className="flex items-center space-x-2">
           <Image
             src={siteConfig.logo}
@@ -50,7 +50,7 @@ export function MobileNav() {
             height={32}
             className="rounded-lg"
           />
-          <span className="text-lg font-bold text-foreground">
+          <span className="font-display text-lg font-bold text-foreground">
             {siteConfig.name}
           </span>
         </Link>
@@ -65,8 +65,8 @@ export function MobileNav() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
-          <div 
-            className="fixed top-0 left-0 h-full w-72 bg-card border-r border-border shadow-medium"
+          <div
+            className="fixed top-0 left-0 h-full w-72 bg-card/95 backdrop-blur-md border-r border-border shadow-medium"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-border">
@@ -97,7 +97,7 @@ export function MobileNav() {
                       'flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all',
                       isActive
                         ? 'bg-gradient-primary text-white'
-                        : 'text-text-secondary hover:bg-muted hover:text-foreground'
+                        : 'text-text-secondary hover:bg-muted/80 hover:text-foreground'
                     )}
                   >
                     <Icon className="h-5 w-5" />

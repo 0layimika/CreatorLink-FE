@@ -1,19 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f7;
-  --foreground: #1a1a1a;
-  --card: #ffffff;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --secondary: #0891b2;
-  --text-primary: #1a1a1a;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
-  --success: #16a34a;
-  --warning: #d97706;
-  --error: #dc2626;
-  --muted: #f1f5f9;
+  --background: #04050a;
+  --foreground: #ffffff;
+  --card: #0d1018;
+  --primary: #0ea5e9;
+  --primary-foreground: #ffffff;
+  --primary-hover: #38bdf8;
+  --secondary: #14b8a6;
+  --secondary-foreground: #021011;
+  --accent: #1a2638;
+  --accent-foreground: #ffffff;
+  --text-primary: #ffffff;
+  --text-secondary: #a9b1c6;
+  --border: #252a40;
+  --input: #252a40;
+  --ring: #0ea5e9;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --destructive: #ef4444;
+  --destructive-foreground: #fff3f3;
+  --muted: #131724;
 }
 
 @theme inline {
@@ -21,25 +29,43 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-muted: var(--muted);
-  --font-bohemian: var(--font-libre-baskerville);
+  --font-display: "Nohemi", "Satoshi", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Satoshi", "Avenir Next", "Segoe UI", sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-bohemian), Georgia, 'Times New Roman', serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+  min-height: 100vh;
 }
 
-/* Custom scrollbar - light theme */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -70,27 +96,33 @@ body {
   color: white;
 }
 
-/* Smooth transitions */
 * {
   transition-property: background-color, border-color, color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
 
-/* Card shadows for light theme */
 .shadow-soft {
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  box-shadow: 0 10px 26px -18px rgb(0 0 0 / 0.75);
 }
 
 .shadow-medium {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  box-shadow: 0 28px 48px -24px rgb(0 0 0 / 0.85);
 }
 
-/* Gradient backgrounds */
 .bg-gradient-soft {
-  background: linear-gradient(135deg, #faf9f7 0%, #f1f5f9 100%);
+  background: var(--background);
 }
 
 .bg-gradient-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #0891b2 100%);
+  background: var(--primary);
+}
+
+.font-display {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+.surface-panel {
+  background: color-mix(in srgb, var(--card) 94%, black 6%);
+  border: 1px solid var(--border);
 }

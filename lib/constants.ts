@@ -19,7 +19,8 @@ export const siteConfig = {
   name: 'LinkVerse',
   description: 'Links & Tips for Creators',
   url: 'https://linkverse.com',
-  logo: '/logo.png',
+  logo: '/logo-mark-v2.png',
+  logoWordmark: '/logo-wordmark-v2.png',
 } as const;
 
 export const dashboardNavItems = [

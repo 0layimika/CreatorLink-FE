@@ -36,6 +36,9 @@ class ApiClient {
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseUrl}${endpoint}`;
+        const method = (options.method || 'GET').toUpperCase();
+        const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+        const mutationId = `${method}:${endpoint}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
@@ -46,6 +49,12 @@ class ApiClient {
         // Remove Content-Type for FormData
         if (options.body instanceof FormData) {
             delete headers['Content-Type'];
+        }
+
+        if (typeof window !== 'undefined' && isMutation) {
+            window.dispatchEvent(new CustomEvent('api:mutation:start', {
+                detail: { id: mutationId, method, endpoint },
+            }));
         }
 
         try {
@@ -101,6 +110,12 @@ class ApiClient {
                 throw error;
             }
             throw new Error('An unexpected error occurred');
+        } finally {
+            if (typeof window !== 'undefined' && isMutation) {
+                window.dispatchEvent(new CustomEvent('api:mutation:end', {
+                    detail: { id: mutationId, method, endpoint },
+                }));
+            }
         }
     }
 

@@ -1,27 +1,20 @@
 import type { Metadata } from 'next';
-import { Libre_Baskerville, Source_Sans_3 } from 'next/font/google';
 import { AppProviders } from '@/components/providers/AppProviders';
 import './globals.css';
-
-const libreBaskerville = Libre_Baskerville({
-  variable: '--font-libre-baskerville',
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-});
-
-const sourceSans = Source_Sans_3({
-  variable: '--font-source-sans',
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'LinkVerse - Links & Tips for Creators',
   description:
     'The all-in-one link-in-bio platform for creators. Consolidate your social profiles, accept tips, track analytics, and grow your audience.',
   keywords: ['creator', 'link in bio', 'social media', 'analytics', 'tips', 'linkverse'],
+  icons: {
+    icon: [
+      { url: '/favicon.ico?v=2' },
+      { url: '/logo-mark-v2.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico?v=2',
+    apple: '/logo-mark-v2-square.png',
+  },
 };
 
 export default function RootLayout({
@@ -31,9 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
-      >
+      <body className="antialiased">
         <AppProviders>
           {children}
         </AppProviders>
