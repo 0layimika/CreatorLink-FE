@@ -31,11 +31,11 @@ export function ProfileHeader({ user, textColor, storeUrl }: ProfileHeaderProps)
         {storeUrl && (
           <a
             href={storeUrl}
-            className="inline-flex items-center text-xs px-2 py-1 rounded-full border border-border bg-card/70 shadow-soft"
-            style={textColor ? mutedStyle : undefined}
+            className="inline-flex items-center text-xs sm:text-sm px-3 py-1.5 rounded-full border border-primary/50 bg-primary/20 text-primary shadow-soft hover:bg-primary/30 transition-colors"
+            style={textColor ? { color: textColor, borderColor: `${textColor}99`, backgroundColor: `${textColor}1F` } : undefined}
           >
-            <ShoppingBag className="h-3 w-3 mr-1" />
-            Store
+            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+            Visit Store
           </a>
         )}
       </div>

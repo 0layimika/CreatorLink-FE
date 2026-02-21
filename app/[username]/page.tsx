@@ -125,6 +125,17 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
           storeUrl={storeUrl}
         />
 
+        {storeUrl && (
+          <div className="mt-6">
+            <Link href={storeUrl} className="block">
+              <Button className="w-full h-12 text-base font-bold">
+                <span className="mr-2">Store</span>
+                <span className="opacity-80">Buy products & book services</span>
+              </Button>
+            </Link>
+          </div>
+        )}
+
         <div className="mt-8 space-y-4">
           {links.map((link) => (
             <LinkButton key={link.id} link={link} textColor={profileConfig?.text_color || undefined} />

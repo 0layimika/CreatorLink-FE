@@ -1,4 +1,4 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.linkverse.live/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8010/api/v1';
 
 interface ApiResponse<T = unknown> {
     success: boolean;
@@ -346,7 +346,7 @@ export const mediaApi = {
     upload: (file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return api.post<{ url: string; fileId: string }>('/media/upload', formData);
+        return api.post<{ url: string; fileId: string; fileType?: string; size?: number }>('/media/upload', formData);
     },
 
     delete: (fileId: string) =>
@@ -433,6 +433,8 @@ export const storeApi = {
         const query = queryParams.toString();
         return api.get(`/store/orders${query ? `?${query}` : ''}`);
     },
+    updateOrderStatus: (orderId: number, status: 'cancelled' | 'refunded') =>
+        api.patch(`/store/orders/${orderId}/status`, { status }),
     resendOrderEmail: (orderId: number) => api.post(`/store/orders/${orderId}/resend-email`),
 
     listBookings: (params?: { limit?: number; offset?: number }) => {
@@ -442,6 +444,8 @@ export const storeApi = {
         const query = queryParams.toString();
         return api.get(`/store/bookings${query ? `?${query}` : ''}`);
     },
+    updateBookingStatus: (bookingId: number, status: 'confirmed' | 'cancelled' | 'expired') =>
+        api.patch(`/store/bookings/${bookingId}/status`, { status }),
 
     getStorefront: (username: string, params?: { limit?: number; offset?: number }) => {
         const queryParams = new URLSearchParams();
@@ -456,6 +460,8 @@ export const storeApi = {
         buyer_name?: string;
         buyer_phone?: string;
         delivery_address?: Record<string, any> | null;
+        hold_booking_id?: number;
+        hold_token?: string;
         slot_start?: string;
         slot_end?: string;
     }) => api.post(`/store/${username}/buy/${productId}`, data),
@@ -484,4 +490,11 @@ export const storeApi = {
 
     createAvailability: (data: { weekday: number; start_time: string; end_time: string; timezone: string }) =>
         api.post('/store/availability', data),
+    updateAvailability: (id: number, data: Partial<{ weekday: number; start_time: string; end_time: string; timezone: string }>) =>
+        api.patch(`/store/availability/${id}`, data),
+    deleteAvailability: (id: number) => api.delete(`/store/availability/${id}`),
+    listOwnerServiceSlots: (serviceId: number, params: { from: string; to: string }) =>
+        api.get(`/store/services/${serviceId}/slots?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`),
+    blockServiceSlot: (data: { service_id: number; slot_start: string; slot_end: string; notes?: string }) =>
+        api.post('/store/services/block', data),
 };

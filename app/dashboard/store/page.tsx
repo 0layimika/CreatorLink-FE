@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Loader2, Upload, Package, Calendar, ShoppingBag } from 'lucide-react';
+import { Plus, Loader2, Upload, Package, Calendar, ShoppingBag, Search, Pencil, Trash2, X, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -19,6 +19,8 @@ const defaultProduct = {
   cover_url: '',
   file_url: '',
   file_id: '',
+  file_type: '',
+  file_size: undefined as number | undefined,
   download_limit: 3,
   duration_minutes: 30,
   buffer_minutes: 0,
@@ -35,6 +37,11 @@ const weekdays = [
   { value: 5, label: 'Friday' },
   { value: 6, label: 'Saturday' },
 ];
+
+const dayKeyFromIso = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export default function StoreDashboardPage() {
   const { user } = useAuth();
@@ -62,6 +69,26 @@ export default function StoreDashboardPage() {
     timezone: 'Africa/Lagos',
   });
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
+  const [productFilter, setProductFilter] = useState<'all' | 'digital' | 'physical' | 'service'>('all');
+  const [productQuery, setProductQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'>('all');
+  const [orderQuery, setOrderQuery] = useState('');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<'all' | 'hold' | 'confirmed' | 'expired' | 'cancelled'>('all');
+  const [bookingQuery, setBookingQuery] = useState('');
+  const [editingAvailabilityId, setEditingAvailabilityId] = useState<number | null>(null);
+  const [editingAvailabilityForm, setEditingAvailabilityForm] = useState({
+    weekday: 1,
+    start_time: '',
+    end_time: '',
+    timezone: 'Africa/Lagos',
+  });
+  const [ownerBlockServiceId, setOwnerBlockServiceId] = useState<number | null>(null);
+  const [ownerBlockSlots, setOwnerBlockSlots] = useState<Array<{ start: string; end: string }>>([]);
+  const [ownerBlockMonth, setOwnerBlockMonth] = useState<Date>(new Date());
+  const [ownerBlockSelectedDay, setOwnerBlockSelectedDay] = useState<string | null>(null);
+  const [ownerBlockSelectedSlot, setOwnerBlockSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  const [ownerBlockLoading, setOwnerBlockLoading] = useState(false);
+  const [timelineItem, setTimelineItem] = useState<{ type: 'order' | 'booking'; payload: StoreOrder | ServiceBooking } | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -97,6 +124,12 @@ export default function StoreDashboardPage() {
     fetchAll();
   }, []);
 
+  useEffect(() => {
+    if (!ownerBlockServiceId) return;
+    fetchOwnerSlots(ownerBlockServiceId).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerBlockServiceId, ownerBlockMonth]);
+
   const handleCoverUpload = async (file: File) => {
     const response = await mediaApi.upload(file);
     if (response.success && response.data?.url) {
@@ -113,6 +146,8 @@ export default function StoreDashboardPage() {
         ...prev,
         file_url: response.data!.url,
         file_id: response.data!.fileId,
+        file_type: response.data!.fileType || '',
+        file_size: response.data!.size,
       }));
     } else {
       throw new Error('Failed to upload file');
@@ -144,6 +179,8 @@ export default function StoreDashboardPage() {
         download_limit: productForm.type === 'digital' ? (productForm.download_limit || 3) : undefined,
         file_id: productForm.file_id || null,
         file_url: productForm.file_url || null,
+        file_type: productForm.file_type || null,
+        file_size: productForm.file_size ?? null,
         duration_minutes: productForm.type === 'service' ? productForm.duration_minutes : null,
         buffer_minutes: productForm.type === 'service' ? productForm.buffer_minutes : null,
         timezone: productForm.type === 'service' ? productForm.timezone : null,
@@ -191,7 +228,200 @@ export default function StoreDashboardPage() {
     }
   };
 
+  const handleUpdateOrderStatus = async (orderId: number, status: 'cancelled' | 'refunded') => {
+    try {
+      const res = await storeApi.updateOrderStatus(orderId, status);
+      if (!res.success) throw new Error(res.message || 'Failed to update order status');
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+      addToast('Order status updated', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to update order status', 'error');
+    }
+  };
+
+  const handleUpdateBookingStatus = async (bookingId: number, status: 'confirmed' | 'cancelled' | 'expired') => {
+    try {
+      const res = await storeApi.updateBookingStatus(bookingId, status);
+      if (!res.success) throw new Error(res.message || 'Failed to update booking status');
+      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
+      addToast('Booking status updated', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to update booking status', 'error');
+    }
+  };
+
+  const startEditAvailability = (window: ServiceAvailabilityWindow) => {
+    setEditingAvailabilityId(window.id);
+    setEditingAvailabilityForm({
+      weekday: window.weekday,
+      start_time: window.start_time,
+      end_time: window.end_time,
+      timezone: window.timezone,
+    });
+  };
+
+  const saveEditAvailability = async () => {
+    if (!editingAvailabilityId) return;
+    try {
+      const res = await storeApi.updateAvailability(editingAvailabilityId, editingAvailabilityForm);
+      if (!res.success || !res.data) throw new Error(res.message || 'Failed to update availability');
+      setAvailability((prev) =>
+        prev.map((w) => (w.id === editingAvailabilityId ? (res.data as ServiceAvailabilityWindow) : w))
+      );
+      setEditingAvailabilityId(null);
+      addToast('Availability updated', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to update availability', 'error');
+    }
+  };
+
+  const deleteAvailability = async (id: number) => {
+    try {
+      const res = await storeApi.deleteAvailability(id);
+      if (!res.success) throw new Error(res.message || 'Failed to delete availability');
+      setAvailability((prev) => prev.filter((w) => w.id !== id));
+      addToast('Availability deleted', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to delete availability', 'error');
+    }
+  };
+
+  const blockSelectedTime = async () => {
+    if (!ownerBlockServiceId || !ownerBlockSelectedSlot) {
+      addToast('Select a service and time to block', 'error');
+      return;
+    }
+    try {
+      setOwnerBlockLoading(true);
+      const res = await storeApi.blockServiceSlot({
+        service_id: ownerBlockServiceId,
+        slot_start: ownerBlockSelectedSlot.start,
+        slot_end: ownerBlockSelectedSlot.end,
+        notes: 'owner_block',
+      });
+      if (!res.success) throw new Error(res.message || 'Failed to block time');
+      addToast('Time blocked successfully', 'success');
+      await fetchOwnerSlots(ownerBlockServiceId);
+      await fetchAll();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to block time', 'error');
+    } finally {
+      setOwnerBlockLoading(false);
+    }
+  };
+
   const displayName = useMemo(() => user?.username || 'creator', [user]);
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesType = productFilter === 'all' ? true : p.type === productFilter;
+      const q = productQuery.trim().toLowerCase();
+      const matchesQuery = q.length === 0
+        ? true
+        : p.title.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+      return matchesType && matchesQuery;
+    });
+  }, [products, productFilter, productQuery]);
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      const matchesStatus = orderStatusFilter === 'all' ? true : o.status === orderStatusFilter;
+      const q = orderQuery.trim().toLowerCase();
+      const matchesQuery = q.length === 0
+        ? true
+        : (o.buyer_email || '').toLowerCase().includes(q) ||
+          (o.product?.title || '').toLowerCase().includes(q) ||
+          (o.reference || '').toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [orders, orderStatusFilter, orderQuery]);
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      const matchesStatus = bookingStatusFilter === 'all' ? true : b.status === bookingStatusFilter;
+      const q = bookingQuery.trim().toLowerCase();
+      const matchesQuery = q.length === 0
+        ? true
+        : (b.buyer_email || '').toLowerCase().includes(q) ||
+          new Date(b.slot_start).toLocaleString().toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [bookings, bookingStatusFilter, bookingQuery]);
+
+  const serviceProducts = useMemo(
+    () => products.filter((p) => p.type === 'service'),
+    [products]
+  );
+
+  useEffect(() => {
+    if (!ownerBlockServiceId && serviceProducts.length > 0) {
+      setOwnerBlockServiceId(serviceProducts[0].id);
+    }
+  }, [ownerBlockServiceId, serviceProducts]);
+
+  const ownerBlockSlotsByDay = useMemo(() => {
+    const grouped = new Map<string, Array<{ start: string; end: string }>>();
+    ownerBlockSlots.forEach((slot) => {
+      const key = dayKeyFromIso(slot.start);
+      const current = grouped.get(key) || [];
+      current.push(slot);
+      grouped.set(key, current);
+    });
+    return grouped;
+  }, [ownerBlockSlots]);
+
+  const ownerBlockAvailableDays = useMemo(
+    () => Array.from(ownerBlockSlotsByDay.keys()).sort(),
+    [ownerBlockSlotsByDay]
+  );
+
+  const ownerBlockTimesForDay = useMemo(() => {
+    if (!ownerBlockSelectedDay) return [];
+    const daySlots = ownerBlockSlotsByDay.get(ownerBlockSelectedDay) || [];
+    return [...daySlots].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  }, [ownerBlockSelectedDay, ownerBlockSlotsByDay]);
+
+  const ownerBlockMonthGrid = useMemo(() => {
+    const year = ownerBlockMonth.getFullYear();
+    const month = ownerBlockMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstWeekday = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<{ date: Date; key: string; inMonth: boolean }> = [];
+
+    for (let i = 0; i < firstWeekday; i += 1) {
+      const d = new Date(year, month, i - firstWeekday + 1);
+      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: false });
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const d = new Date(year, month, day);
+      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: true });
+    }
+    while (cells.length % 7 !== 0) {
+      const d = new Date(year, month + 1, cells.length - (firstWeekday + daysInMonth) + 1);
+      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: false });
+    }
+    return cells;
+  }, [ownerBlockMonth]);
+
+  const fetchOwnerSlots = async (serviceId: number, monthDate?: Date) => {
+    const currentMonth = monthDate || ownerBlockMonth;
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59);
+    const res = await storeApi.listOwnerServiceSlots(serviceId, {
+      from: monthStart.toISOString(),
+      to: monthEnd.toISOString(),
+    });
+    if (res.success && res.data) {
+      const slots = ((res.data as any).slots || []) as Array<{ start: string; end: string }>;
+      setOwnerBlockSlots(slots);
+      setOwnerBlockSelectedSlot(null);
+      if (slots.length > 0) {
+        setOwnerBlockSelectedDay(dayKeyFromIso(slots[0].start));
+      } else {
+        setOwnerBlockSelectedDay(null);
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -240,6 +470,25 @@ export default function StoreDashboardPage() {
         >
           Orders & Bookings
         </Button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-card/40 p-3">
+          <p className="text-xs text-text-secondary">Products</p>
+          <p className="text-xl font-semibold text-foreground">{products.length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/40 p-3">
+          <p className="text-xs text-text-secondary">Active Products</p>
+          <p className="text-xl font-semibold text-foreground">{products.filter((p) => p.is_active).length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/40 p-3">
+          <p className="text-xs text-text-secondary">Orders</p>
+          <p className="text-xl font-semibold text-foreground">{orders.length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/40 p-3">
+          <p className="text-xs text-text-secondary">Bookings</p>
+          <p className="text-xl font-semibold text-foreground">{bookings.length}</p>
+        </div>
       </div>
 
       {activeTab === 'products' && (
@@ -421,11 +670,32 @@ export default function StoreDashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {products.length === 0 ? (
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center mb-4">
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <Input
+                className="pl-9"
+                placeholder="Search products"
+                value={productQuery}
+                onChange={(e) => setProductQuery(e.target.value)}
+              />
+            </div>
+            <select
+              className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value as typeof productFilter)}
+            >
+              <option value="all">All types</option>
+              <option value="digital">Digital</option>
+              <option value="physical">Physical</option>
+              <option value="service">Service</option>
+            </select>
+          </div>
+          {filteredProducts.length === 0 ? (
             <p className="text-text-secondary text-sm">No products yet.</p>
           ) : (
             <div className="space-y-3">
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <div key={product.id} className="flex items-center justify-between gap-4 border-b border-border pb-3">
                   <div className="flex items-center gap-3">
                     {product.cover_url && (
@@ -442,6 +712,9 @@ export default function StoreDashboardPage() {
                       </p>
                     </div>
                   </div>
+                  <span className={`text-[10px] px-2 py-1 rounded-full border ${product.is_active ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/40 text-amber-300 bg-amber-500/10'}`}>
+                    {product.is_active ? 'ACTIVE' : 'INACTIVE'}
+                  </span>
                   <Button
                     size="sm"
                     variant={product.is_active ? 'outline' : 'primary'}
@@ -518,11 +791,174 @@ export default function StoreDashboardPage() {
           </Button>
           <div className="space-y-2">
             {availability.map((window) => (
-              <div key={window.id} className="text-sm text-text-secondary">
-                {weekdays.find((d) => d.value === window.weekday)?.label} • {window.start_time} - {window.end_time} ({window.timezone})
+              <div key={window.id} className="rounded-lg border border-border p-3 text-sm text-text-secondary">
+                {editingAvailabilityId === window.id ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                    <select
+                      className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                      value={editingAvailabilityForm.weekday}
+                      onChange={(e) => setEditingAvailabilityForm((prev) => ({ ...prev, weekday: Number(e.target.value) }))}
+                    >
+                      {weekdays.map((day) => (
+                        <option key={day.value} value={day.value}>{day.label}</option>
+                      ))}
+                    </select>
+                    <Input
+                      type="time"
+                      value={editingAvailabilityForm.start_time}
+                      onChange={(e) => setEditingAvailabilityForm((prev) => ({ ...prev, start_time: e.target.value }))}
+                    />
+                    <Input
+                      type="time"
+                      value={editingAvailabilityForm.end_time}
+                      onChange={(e) => setEditingAvailabilityForm((prev) => ({ ...prev, end_time: e.target.value }))}
+                    />
+                    <Input
+                      value={editingAvailabilityForm.timezone}
+                      onChange={(e) => setEditingAvailabilityForm((prev) => ({ ...prev, timezone: e.target.value }))}
+                    />
+                    <div className="sm:col-span-4 flex gap-2">
+                      <Button size="sm" onClick={saveEditAvailability}>Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingAvailabilityId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>
+                      {weekdays.find((d) => d.value === window.weekday)?.label} • {window.start_time} - {window.end_time} ({window.timezone})
+                    </span>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => startEditAvailability(window)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => deleteAvailability(window.id)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle>Block Time (Owner)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {serviceProducts.length === 0 ? (
+            <p className="text-sm text-white/85">Create at least one service product to block times.</p>
+          ) : (
+            <>
+              <label className="text-sm block">
+                <span className="block text-white/90 mb-1">Service</span>
+                <select
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                  value={ownerBlockServiceId || ''}
+                  onChange={(e) => setOwnerBlockServiceId(Number(e.target.value))}
+                >
+                  {serviceProducts.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="space-y-3 rounded-xl border border-border bg-card/40 p-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setOwnerBlockMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/20 text-white/85 hover:text-white"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <p className="text-sm font-semibold text-white">
+                    {ownerBlockMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setOwnerBlockMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/20 text-white/85 hover:text-white"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-[11px] text-white/80">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center py-1">{day}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {ownerBlockMonthGrid.map((cell) => {
+                    const available = ownerBlockAvailableDays.includes(cell.key);
+                    const selected = ownerBlockSelectedDay === cell.key;
+                    return (
+                      <button
+                        key={`${cell.key}-${cell.inMonth ? 'm' : 'o'}`}
+                        type="button"
+                        disabled={!available}
+                        onClick={() => {
+                          setOwnerBlockSelectedDay(cell.key);
+                          setOwnerBlockSelectedSlot(null);
+                        }}
+                        className={`h-9 rounded-lg border text-xs font-semibold ${
+                          !cell.inMonth
+                            ? 'border-transparent text-white/35'
+                            : available
+                              ? selected
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-background text-white hover:border-primary/60'
+                              : 'border-border/40 text-white/55 cursor-not-allowed'
+                        }`}
+                      >
+                        {cell.date.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-white/85">
+                    {ownerBlockSelectedDay
+                      ? `Available times for ${new Date(`${ownerBlockSelectedDay}T00:00:00`).toLocaleDateString()}`
+                      : 'Select an available day'}
+                  </p>
+                  {ownerBlockSelectedDay && ownerBlockTimesForDay.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {ownerBlockTimesForDay.map((slot) => (
+                        <button
+                          key={slot.start}
+                          type="button"
+                          onClick={() => setOwnerBlockSelectedSlot(slot)}
+                          className={`px-3 py-2 rounded-lg border text-sm ${
+                            ownerBlockSelectedSlot?.start === slot.start
+                              ? 'border-primary bg-primary/20 text-white'
+                              : 'border-border text-white/85 hover:text-white'
+                          }`}
+                        >
+                          {new Date(slot.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-white/75">No available times for this day.</p>
+                  )}
+                </div>
+              </div>
+
+              <Button onClick={blockSelectedTime} disabled={ownerBlockLoading || !ownerBlockSelectedSlot}>
+                {ownerBlockLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+                Block Selected Time
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
       </>
@@ -538,21 +974,76 @@ export default function StoreDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {orders.length === 0 ? (
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center mb-4">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search buyer, product, reference"
+                  value={orderQuery}
+                  onChange={(e) => setOrderQuery(e.target.value)}
+                />
+              </div>
+              <select
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                value={orderStatusFilter}
+                onChange={(e) => setOrderStatusFilter(e.target.value as typeof orderStatusFilter)}
+              >
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            {filteredOrders.length === 0 ? (
               <p className="text-text-secondary text-sm">No orders yet.</p>
             ) : (
               <div className="space-y-3">
-                {orders.map((order) => (
+                {filteredOrders.map((order) => (
                   <div key={order.id} className="flex items-center justify-between border-b border-border pb-2">
                     <div>
                       <p className="text-sm font-medium text-foreground">{order.product?.title || 'Product'}</p>
                       <p className="text-xs text-text-secondary">{order.buyer_email}</p>
                       <p className="text-xs text-text-secondary">
-                        ₦{order.amount.toLocaleString()} • {order.status}
+                        ₦{order.amount.toLocaleString()} •
+                        <span className={`ml-1 px-1.5 py-0.5 rounded border ${
+                          order.status === 'paid' ? 'border-emerald-500/40 text-emerald-300'
+                            : order.status === 'pending' ? 'border-amber-500/40 text-amber-300'
+                            : 'border-red-500/40 text-red-300'
+                        }`}>
+                          {order.status}
+                        </span>
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span className="text-xs text-text-secondary">{order.reference}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTimelineItem({ type: 'order', payload: order })}
+                      >
+                        Timeline
+                      </Button>
+                      {order.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                      {order.status === 'paid' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateOrderStatus(order.id, 'refunded')}
+                        >
+                          Refund
+                        </Button>
+                      )}
                       {order.status === 'paid' && (
                         <Button
                           size="sm"
@@ -594,19 +1085,72 @@ export default function StoreDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {bookings.length === 0 ? (
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center mb-4">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search email or date"
+                  value={bookingQuery}
+                  onChange={(e) => setBookingQuery(e.target.value)}
+                />
+              </div>
+              <select
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                value={bookingStatusFilter}
+                onChange={(e) => setBookingStatusFilter(e.target.value as typeof bookingStatusFilter)}
+              >
+                <option value="all">All statuses</option>
+                <option value="hold">Hold</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="expired">Expired</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            {filteredBookings.length === 0 ? (
               <p className="text-text-secondary text-sm">No bookings yet.</p>
             ) : (
               <div className="space-y-3">
-                {bookings.map((booking) => (
+                {filteredBookings.map((booking) => (
                   <div key={booking.id} className="flex items-center justify-between border-b border-border pb-2">
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         {booking.buyer_email || 'Pending buyer'}
                       </p>
                       <p className="text-xs text-text-secondary">
-                        {new Date(booking.slot_start).toLocaleString()} • {booking.status}
+                        {new Date(booking.slot_start).toLocaleString()} •
+                        <span className={`ml-1 px-1.5 py-0.5 rounded border ${
+                          booking.status === 'confirmed' ? 'border-emerald-500/40 text-emerald-300'
+                            : booking.status === 'hold' ? 'border-amber-500/40 text-amber-300'
+                            : 'border-red-500/40 text-red-300'
+                        }`}>
+                          {booking.status}
+                        </span>
                       </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTimelineItem({ type: 'booking', payload: booking })}
+                      >
+                        Timeline
+                      </Button>
+                      {booking.status === 'hold' && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleUpdateBookingStatus(booking.id, 'confirmed')}>
+                            Confirm
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}>
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+                      {booking.status === 'confirmed' && (
+                        <Button size="sm" variant="outline" onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}>
+                          Cancel
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -620,6 +1164,61 @@ export default function StoreDashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
+
+      {timelineItem && (
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/40">
+          <div className="w-full max-w-md h-full bg-background border-l border-border p-5 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                {timelineItem.type === 'order' ? 'Order Timeline' : 'Booking Timeline'}
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setTimelineItem(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {timelineItem.type === 'order' ? (
+              <div className="space-y-3 text-sm">
+                {(() => {
+                  const order = timelineItem.payload as StoreOrder;
+                  const events = [
+                    { label: 'Order created', at: order.created_at },
+                    { label: `Status: ${order.status}`, at: order.updated_at || order.created_at },
+                  ];
+                  return events.map((event, idx) => (
+                    <div key={`${event.label}-${idx}`} className="rounded-lg border border-border p-3">
+                      <p className="text-foreground font-medium">{event.label}</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {event.at ? new Date(event.at).toLocaleString() : 'N/A'}
+                      </p>
+                    </div>
+                  ));
+                })()}
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                {(() => {
+                  const booking = timelineItem.payload as ServiceBooking;
+                  const events = [
+                    { label: 'Booking created', at: booking.created_at },
+                    { label: `Status: ${booking.status}`, at: booking.updated_at || booking.created_at },
+                    { label: 'Slot start', at: booking.slot_start },
+                    { label: 'Slot end', at: booking.slot_end },
+                  ];
+                  return events.map((event, idx) => (
+                    <div key={`${event.label}-${idx}`} className="rounded-lg border border-border p-3">
+                      <p className="text-foreground font-medium">{event.label}</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {event.at ? new Date(event.at).toLocaleString() : 'N/A'}
+                      </p>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
