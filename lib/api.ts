@@ -1,4 +1,15 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://linkverse.pxxl.click/api/v1';
+const getDefaultApiBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (isLocalHost) {
+            return 'http://localhost:8010/api/v1';
+        }
+    }
+
+    return 'https://linkverse.pxxl.click/api/v1';
+};
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || getDefaultApiBaseUrl();
 
 interface ApiResponse<T = unknown> {
     success: boolean;
@@ -343,10 +354,96 @@ export const profileApi = {
 
 // Media API
 export const mediaApi = {
-    upload: (file: File) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        return api.post<{ url: string; fileId: string; fileType?: string; size?: number }>('/media/upload', formData);
+    upload: async (file: File) => {
+        const FILE_TOO_LARGE_MESSAGE = 'Image too large. Keep it below 10MB.';
+        const normalizeUploadError = (message: string) => {
+            const normalized = message.toLowerCase();
+            const isTooLarge = normalized.includes('too large')
+                || normalized.includes('file size')
+                || normalized.includes('max file size')
+                || normalized.includes('request entity too large')
+                || normalized.includes('content too large')
+                || normalized.includes('413');
+            return isTooLarge ? FILE_TOO_LARGE_MESSAGE : message;
+        };
+
+        const uploadViaApi = () => {
+            const formData = new FormData();
+            formData.append('file', file);
+            return api.post<{ url: string; fileId: string; fileType?: string; size?: number }>('/media/upload', formData);
+        };
+
+        const lowerName = file.name.toLowerCase();
+        const isHeicFamily = file.type === 'image/heic'
+            || file.type === 'image/heif'
+            || lowerName.endsWith('.heic')
+            || lowerName.endsWith('.heif');
+        const targetFormat = isHeicFamily ? 'jpg' : undefined;
+
+        try {
+            const signResponse = await api.post<{
+                timestamp: number;
+                signature: string;
+                apiKey: string;
+                cloudName: string;
+                folder: string;
+                format?: string;
+            }>('/media/sign-upload', targetFormat ? { format: targetFormat } : {});
+
+            if (!signResponse.success || !signResponse.data) {
+                throw new Error(signResponse.message || 'Failed to initialize upload');
+            }
+
+            const { timestamp, signature, apiKey, cloudName, folder, format } = signResponse.data;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('api_key', apiKey);
+            formData.append('timestamp', String(timestamp));
+            formData.append('signature', signature);
+            formData.append('folder', folder);
+            if (format) {
+                formData.append('format', format);
+            }
+
+            const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            let uploadData: any = null;
+            try {
+                uploadData = await uploadResponse.json();
+            } catch {
+                throw new Error('Upload failed: invalid Cloudinary response');
+            }
+
+            if (!uploadResponse.ok) {
+                throw new Error(normalizeUploadError(uploadData?.error?.message || 'Failed to upload file'));
+            }
+
+            return {
+                success: true,
+                data: {
+                    url: uploadData.secure_url as string,
+                    fileId: uploadData.public_id as string,
+                    fileType: uploadData.resource_type as string,
+                    size: uploadData.bytes as number,
+                },
+            } as ApiResponse<{ url: string; fileId: string; fileType?: string; size?: number }>;
+        } catch (error) {
+            const directUploadMessage = error instanceof Error ? error.message : 'Failed to upload file';
+            if (normalizeUploadError(directUploadMessage) === FILE_TOO_LARGE_MESSAGE) {
+                throw new Error(FILE_TOO_LARGE_MESSAGE);
+            }
+
+            try {
+                return await uploadViaApi();
+            } catch (fallbackError) {
+                const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Failed to upload file';
+                throw new Error(normalizeUploadError(fallbackMessage));
+            }
+        }
     },
 
     delete: (fileId: string) =>

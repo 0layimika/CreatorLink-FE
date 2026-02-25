@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Camera, Loader2, Save, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
@@ -26,6 +26,22 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const showUploadError = (message: string) => {
+    setError(message);
+    addToast(message, 'error');
+  };
+
+  useEffect(() => {
+    if (!creator) return;
+
+    setFormData({
+      username: creator.username || '',
+      first_name: creator.first_name || '',
+      last_name: creator.last_name || '',
+      bio: creator.bio || '',
+    });
+    setAvatarUrl(creator.avatar_url || '');
+  }, [creator]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -37,13 +53,13 @@ export default function SettingsPage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      showUploadError('Please select an image file');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image must be less than 10MB');
+      showUploadError('Image too large. Keep it below 10MB.');
       return;
     }
 

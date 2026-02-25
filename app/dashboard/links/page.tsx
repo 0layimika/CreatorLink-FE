@@ -65,20 +65,38 @@ export default function LinksPage() {
 
   const displayName = `${creator?.first_name || ''} ${creator?.last_name || ''}`.trim() || creator?.username || user?.username || 'Creator';
   const avatarUrl = creator?.avatar_url || user?.avatar || '';
+  const showUploadError = (message: string) => {
+    setError(message);
+    addToast(message, 'error');
+  };
+
+  const openFilePicker = (input: HTMLInputElement | null) => {
+    if (!input) return;
+    input.value = '';
+    try {
+      if (typeof (input as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
+        (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+        return;
+      }
+    } catch {
+      // Fallback to click when showPicker is unavailable/restricted.
+    }
+    input.click();
+  };
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click();
+    openFilePicker(fileInputRef.current);
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      showUploadError('Please select an image file');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image must be less than 10MB');
+      showUploadError('Image too large. Keep it below 10MB.');
       return;
     }
     setAvatarUploading(true);
@@ -100,18 +118,18 @@ export default function LinksPage() {
   };
 
   const handleBgImageClick = () => {
-    bgImageInputRef.current?.click();
+    openFilePicker(bgImageInputRef.current);
   };
 
   const handleBgImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      showUploadError('Please select an image file');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image must be less than 10MB');
+      showUploadError('Image too large. Keep it below 10MB.');
       return;
     }
     setBgImageUploading(true);
@@ -128,6 +146,7 @@ export default function LinksPage() {
           background_type: 'image',
           background_value: response.data.url,
         });
+        addToast('Background image updated', 'success');
       } else {
         throw new Error('Failed to upload image');
       }
@@ -144,11 +163,11 @@ export default function LinksPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      showUploadError('Please select an image file');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image must be less than 10MB');
+      showUploadError('Image too large. Keep it below 10MB.');
       return;
     }
     setThumbnailUploading(mode);
@@ -546,13 +565,13 @@ export default function LinksPage() {
                         onChange={(e) => handleThumbnailUpload(e, 'new')}
                         className="hidden"
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => newLinkThumbRef.current?.click()}
-                        disabled={thumbnailUploading === 'new'}
-                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openFilePicker(newLinkThumbRef.current)}
+                          disabled={thumbnailUploading === 'new'}
+                        >
                         {thumbnailUploading === 'new' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
                         {thumbnailUploading === 'new' ? 'Uploading...' : newLink.thumbnail_url ? 'Change' : 'Upload'}
                       </Button>
@@ -629,7 +648,7 @@ export default function LinksPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => editLinkThumbRef.current?.click()}
+                        onClick={() => openFilePicker(editLinkThumbRef.current)}
                         disabled={thumbnailUploading === 'edit'}
                       >
                         {thumbnailUploading === 'edit' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
