@@ -1,4 +1,4 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8010/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://linkverse.pxxl.click/api/v1';
 
 interface ApiResponse<T = unknown> {
     success: boolean;
