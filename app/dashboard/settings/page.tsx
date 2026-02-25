@@ -41,9 +41,9 @@ export default function SettingsPage() {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image must be less than 10MB');
       return;
     }
 
@@ -184,7 +184,7 @@ export default function SettingsPage() {
               <div className="text-center sm:text-left">
                 <p className="text-sm font-medium text-foreground">Profile Photo</p>
                 <p className="text-xs text-text-secondary mt-1">
-                  Click to upload a new photo. JPG, PNG or GIF. Max 5MB.
+                  Click to upload a new photo. JPG, PNG or GIF. Max 10MB.
                 </p>
                 <Button
                   type="button"

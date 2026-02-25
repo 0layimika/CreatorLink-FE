@@ -77,8 +77,8 @@ export default function LinksPage() {
       setError('Please select an image file');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image must be less than 10MB');
       return;
     }
     setAvatarUploading(true);
@@ -110,8 +110,8 @@ export default function LinksPage() {
       setError('Please select an image file');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image must be less than 10MB');
       return;
     }
     setBgImageUploading(true);
@@ -147,8 +147,8 @@ export default function LinksPage() {
       setError('Please select an image file');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image must be less than 10MB');
       return;
     }
     setThumbnailUploading(mode);
@@ -331,7 +331,7 @@ export default function LinksPage() {
               </div>
               <div className="text-center sm:text-left">
                 <p className="text-sm text-text-secondary">
-                  Click to upload a new photo. JPG, PNG or GIF. Max 5MB.
+                  Click to upload a new photo. JPG, PNG or GIF. Max 10MB.
                 </p>
                 <Button
                   type="button"
@@ -432,7 +432,7 @@ export default function LinksPage() {
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 5MB.</p>
+                    <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 10MB.</p>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
@@ -569,7 +569,7 @@ export default function LinksPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 5MB.</p>
+                  <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 10MB.</p>
                 </div>
                 <div className="flex space-x-2">
                   <Button onClick={handleAddLink} isLoading={isSubmitting}>
@@ -648,7 +648,7 @@ export default function LinksPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 5MB.</p>
+                  <p className="text-xs text-text-secondary mt-1">JPG, PNG or GIF. Max 10MB.</p>
                 </div>
                 <div className="flex space-x-2">
                   <Button onClick={handleSaveEdit} isLoading={isSubmitting}>
