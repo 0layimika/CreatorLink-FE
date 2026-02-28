@@ -103,7 +103,7 @@ export function LinkButton({ link, textColor }: LinkButtonProps) {
           <img
             src={logoUrl}
             alt=""
-            className="w-6 h-6 object-contain"
+            className="w-full h-full object-cover rounded-full"
             onError={() => setLogoIndex((prev) => prev + 1)}
           />
         </div>
