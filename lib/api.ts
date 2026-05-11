@@ -495,6 +495,8 @@ export const storeApi = {
         buffer_minutes?: number | null;
         timezone?: string | null;
         requires_address?: boolean;
+        track_inventory?: boolean;
+        stock_quantity?: number | null;
     }) => api.post('/store/products', data),
 
     updateProduct: (id: number, data: Partial<{
@@ -513,6 +515,8 @@ export const storeApi = {
         buffer_minutes?: number | null;
         timezone?: string | null;
         requires_address?: boolean;
+        track_inventory?: boolean;
+        stock_quantity?: number | null;
     }>) => api.patch(`/store/products/${id}`, data),
 
     listMyProducts: (params?: { limit?: number; offset?: number }) => {
@@ -554,14 +558,22 @@ export const storeApi = {
 
     initiatePurchase: (username: string, productId: number, data: {
         buyer_email: string;
-        buyer_name?: string;
-        buyer_phone?: string;
+        buyer_name: string;
+        buyer_phone: string;
         delivery_address?: Record<string, any> | null;
         hold_booking_id?: number;
         hold_token?: string;
         slot_start?: string;
         slot_end?: string;
     }) => api.post(`/store/${username}/buy/${productId}`, data),
+
+    checkoutCart: (username: string, data: {
+        buyer_email: string;
+        buyer_name: string;
+        buyer_phone: string;
+        delivery_address?: Record<string, any> | null;
+        items: Array<{ product_id: number; quantity: number }>;
+    }) => api.post(`/store/${username}/cart/checkout`, data),
 
     verifyPurchase: (reference: string) =>
         api.get(`/store/verify?reference=${reference}`),

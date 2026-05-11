@@ -115,6 +115,19 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   };
 
   const storeUrl = store?.products?.length ? `/${username}/store` : null;
+  const storeLink = storeUrl
+    ? {
+        id: 'store-link',
+        title: `Buy from ${username}'s store`,
+        url: storeUrl,
+        icon: 'ShoppingBag',
+        thumbnail_url: 'https://em-content.zobj.net/thumbs/120/apple/354/shopping-bags_1f6cd-fe0f.png',
+        clicks: 0,
+        enabled: true,
+        order: -1,
+      }
+    : null;
+  const displayLinks = storeLink ? [storeLink, ...links] : links;
 
   return (
     <div style={bgStyle}>
@@ -122,27 +135,15 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
         <ProfileHeader
           user={user}
           textColor={profileConfig?.text_color || undefined}
-          storeUrl={storeUrl}
         />
 
-        {storeUrl && (
-          <div className="mt-6">
-            <Link href={storeUrl} className="block">
-              <Button className="w-full h-12 text-base font-bold">
-                <span className="mr-2">Store</span>
-                <span className="opacity-80">Buy products & book services</span>
-              </Button>
-            </Link>
-          </div>
-        )}
-
         <div className="mt-8 space-y-4">
-          {links.map((link) => (
+          {displayLinks.map((link) => (
             <LinkButton key={link.id} link={link} textColor={profileConfig?.text_color || undefined} />
           ))}
         </div>
 
-        {links.length === 0 && (
+        {displayLinks.length === 0 && (
           <div className="mt-8 text-center opacity-70">
             <p>No links added yet.</p>
           </div>

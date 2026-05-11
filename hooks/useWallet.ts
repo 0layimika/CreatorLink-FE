@@ -69,7 +69,10 @@ export function useWallet(): UseWalletReturn {
             ]);
 
             if (walletRes.success && walletRes.data) {
-                setWallet(walletRes.data);
+                setWallet({
+                    ...walletRes.data,
+                    currency: 'NGN',
+                });
             }
 
             if (transactionsRes.success && transactionsRes.data && Array.isArray(transactionsRes.data)) {
@@ -109,7 +112,10 @@ export function useWallet(): UseWalletReturn {
                         walletApi.getTransactions({ limit: 10 }),
                     ]);
                     if (refetchWallet.success && refetchWallet.data) {
-                        setWallet(refetchWallet.data);
+                        setWallet({
+                            ...refetchWallet.data,
+                            currency: 'NGN',
+                        });
                     }
                     if (refetchTx.success && refetchTx.data && Array.isArray(refetchTx.data)) {
                         setTransactions(refetchTx.data.map((t: any) => ({
@@ -205,4 +211,3 @@ export function useWallet(): UseWalletReturn {
         refetch: fetchWallet,
     };
 }
-

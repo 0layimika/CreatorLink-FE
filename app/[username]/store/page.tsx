@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ShoppingBag, Calendar, Download, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { Loader2, ShoppingBag, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -28,7 +28,6 @@ const dayKeyFromIso = (iso: string) => {
 
 export default function PublicStorePage() {
   const params = useParams<{ username: string }>();
-  const router = useRouter();
   const username = params.username;
 
   const [store, setStore] = useState<StorefrontData | null>(null);
@@ -36,6 +35,8 @@ export default function PublicStorePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  const [cartItems, setCartItems] = useState<Array<{ product_id: number; quantity: number }>>([]);
+  const [isCartCheckoutOpen, setIsCartCheckoutOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1);
   const [buyer, setBuyer] = useState({
     email: '',
@@ -60,6 +61,24 @@ export default function PublicStorePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [redirectInfo, setRedirectInfo] = useState<{ url: string; reference: string } | null>(null);
+
+  const isServiceCheckout = Boolean(selectedProduct);
+  const cartProductMap = useMemo(() => {
+    const map = new Map<number, StoreProduct>();
+    (store?.products || []).forEach((product) => map.set(product.id, product));
+    return map;
+  }, [store]);
+  const cartDetailedItems = useMemo(() => {
+    return cartItems
+      .map((item) => ({ item, product: cartProductMap.get(item.product_id) }))
+      .filter((entry) => Boolean(entry.product)) as Array<{ item: { product_id: number; quantity: number }; product: StoreProduct }>;
+  }, [cartItems, cartProductMap]);
+  const cartSubtotal = useMemo(() => cartDetailedItems.reduce((sum, entry) => sum + (entry.product.price * entry.item.quantity), 0), [cartDetailedItems]);
+  const cartHasPhysical = useMemo(() => cartDetailedItems.some((entry) => entry.product.type === 'physical'), [cartDetailedItems]);
+  const cartPlatformFee = useMemo(() => Number((cartSubtotal * 0.025).toFixed(2)), [cartSubtotal]);
+  const cartTotal = useMemo(() => Number((cartSubtotal + cartPlatformFee).toFixed(2)), [cartSubtotal, cartPlatformFee]);
+  const servicePlatformFee = useMemo(() => Number((((selectedProduct?.price || 0) * 0.025)).toFixed(2)), [selectedProduct]);
+  const serviceTotal = useMemo(() => Number((((selectedProduct?.price || 0) + servicePlatformFee)).toFixed(2)), [selectedProduct, servicePlatformFee]);
 
   useEffect(() => {
     const fetchStore = async () => {
@@ -148,7 +167,18 @@ export default function PublicStorePage() {
   };
 
   const handleOpenCheckout = async (product: StoreProduct) => {
+    if (product.type !== 'service') {
+      setCartItems((prev) => {
+        const existing = prev.find((p) => p.product_id === product.id);
+        if (existing) {
+          return prev.map((p) => p.product_id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+        }
+        return [...prev, { product_id: product.id, quantity: 1 }];
+      });
+      return;
+    }
     setSelectedProduct(product);
+    setIsCartCheckoutOpen(false);
     setCheckoutStep(1);
     setSelectedSlot(null);
     setSelectedDayKey(null);
@@ -159,6 +189,14 @@ export default function PublicStorePage() {
     if (product.type !== 'service') {
       setSlots([]);
     }
+  };
+
+  const openCartCheckout = () => {
+    if (cartItems.length === 0) return;
+    setSelectedProduct(null);
+    setIsCartCheckoutOpen(true);
+    setCheckoutStep(1);
+    setError(null);
   };
 
   useEffect(() => {
@@ -224,7 +262,7 @@ export default function PublicStorePage() {
   };
 
   const handleCheckout = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct && !isCartCheckoutOpen) return;
     if (!buyer.email) {
       setError('Email is required');
       return;
@@ -233,7 +271,7 @@ export default function PublicStorePage() {
     setError(null);
     try {
       let holdPayload: { id: number; hold_token?: string | null } | null = null;
-      if (selectedProduct.type === 'service') {
+      if (isServiceCheckout && selectedProduct?.type === 'service') {
         if (!selectedSlot) throw new Error('Select a time slot');
         const isSameSlotHeld =
           slotHold &&
@@ -252,16 +290,24 @@ export default function PublicStorePage() {
         }
       }
 
-      const res = await storeApi.initiatePurchase(username, selectedProduct.id, {
-        buyer_email: buyer.email,
-        buyer_name: buyer.name || undefined,
-        buyer_phone: buyer.phone || undefined,
-        delivery_address: selectedProduct.type === 'physical' ? { address: buyer.address } : undefined,
-        hold_booking_id: selectedProduct.type === 'service' ? holdPayload?.id : undefined,
-        hold_token: selectedProduct.type === 'service' ? holdPayload?.hold_token || undefined : undefined,
-        slot_start: selectedProduct.type === 'service' ? selectedSlot?.start : undefined,
-        slot_end: selectedProduct.type === 'service' ? selectedSlot?.end : undefined,
-      });
+      const res = isServiceCheckout && selectedProduct
+        ? await storeApi.initiatePurchase(username, selectedProduct.id, {
+            buyer_email: buyer.email,
+            buyer_name: buyer.name,
+            buyer_phone: buyer.phone,
+            delivery_address: selectedProduct.type === 'physical' ? { address: buyer.address } : undefined,
+            hold_booking_id: selectedProduct.type === 'service' ? holdPayload?.id : undefined,
+            hold_token: selectedProduct.type === 'service' ? holdPayload?.hold_token || undefined : undefined,
+            slot_start: selectedProduct.type === 'service' ? selectedSlot?.start : undefined,
+            slot_end: selectedProduct.type === 'service' ? selectedSlot?.end : undefined,
+          })
+        : await storeApi.checkoutCart(username, {
+            buyer_email: buyer.email,
+            buyer_name: buyer.name,
+            buyer_phone: buyer.phone,
+            delivery_address: cartHasPhysical ? { address: buyer.address } : undefined,
+            items: cartItems,
+          });
       if (res.success && res.data) {
         const authUrl = (res.data as any).authorization_url;
         const reference = (res.data as any).reference as string;
@@ -286,17 +332,34 @@ export default function PublicStorePage() {
       setError('Email is required');
       return;
     }
+    if (!buyer.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+    if (!buyer.phone.trim()) {
+      setError('Phone is required');
+      return;
+    }
     setError(null);
     setCheckoutStep(2);
   };
 
   const proceedFromStepTwo = () => {
-    if (!selectedProduct) return;
-    if (selectedProduct.type === 'service' && !selectedSlot) {
+    if (isServiceCheckout && selectedProduct?.type === 'service' && !selectedSlot) {
       setError('Select a time slot');
       return;
     }
-    if (selectedProduct.type === 'physical' && !buyer.address.trim()) {
+    if ((!isServiceCheckout && cartHasPhysical) || (isServiceCheckout && selectedProduct?.type === 'physical')) {
+      if (!buyer.address.trim()) {
+        setError('Delivery address is required');
+        return;
+      }
+    }
+    if (!isServiceCheckout && cartItems.length === 0) {
+      setError('Your cart is empty');
+      return;
+    }
+    if (isServiceCheckout && selectedProduct?.type === 'physical' && !buyer.address.trim()) {
       setError('Delivery address is required');
       return;
     }
@@ -377,13 +440,9 @@ export default function PublicStorePage() {
                     <>
                       <Calendar className="h-4 w-4 mr-2" /> Book Service
                     </>
-                  ) : product.type === 'digital' ? (
-                    <>
-                      <Download className="h-4 w-4 mr-2" /> Buy & Download
-                    </>
                   ) : (
                     <>
-                      <ShoppingBag className="h-4 w-4 mr-2" /> Buy Product
+                      <ShoppingBag className="h-4 w-4 mr-2" /> Add to Cart
                     </>
                   )}
                 </Button>
@@ -392,12 +451,47 @@ export default function PublicStorePage() {
           ))}
         </div>
 
-        {selectedProduct && (
+        <Card className="shadow-soft">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-semibold text-foreground">Cart</p>
+              <p className="text-sm text-text-secondary">{cartDetailedItems.length} item types</p>
+            </div>
+            {cartDetailedItems.length === 0 ? (
+              <p className="text-sm text-text-secondary">Your cart is empty.</p>
+            ) : (
+              <div className="space-y-2">
+                {cartDetailedItems.map(({ item, product }) => (
+                  <div key={product.id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="text-foreground">{product.title}</p>
+                      <p className="text-text-secondary">{item.quantity} x ₦{product.price.toLocaleString()}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" onClick={() => setCartItems((prev) => prev.map((p) => p.product_id === product.id ? { ...p, quantity: Math.max(1, p.quantity - 1) } : p))}>-</Button>
+                      <span className="min-w-6 text-center">{item.quantity}</span>
+                      <Button variant="outline" onClick={() => setCartItems((prev) => prev.map((p) => p.product_id === product.id ? { ...p, quantity: p.quantity + 1 } : p))}>+</Button>
+                      <Button variant="ghost" onClick={() => setCartItems((prev) => prev.filter((p) => p.product_id !== product.id))}>Remove</Button>
+                    </div>
+                  </div>
+                ))}
+                <p className="pt-2 border-t border-border text-foreground font-semibold">Subtotal: ₦{cartSubtotal.toLocaleString()}</p>
+                <p className="text-sm text-text-secondary">Platform Fee (2.5%): ₦{cartPlatformFee.toLocaleString()}</p>
+                <p className="text-sm font-semibold text-foreground">Total: ₦{cartTotal.toLocaleString()}</p>
+              </div>
+            )}
+            <Button onClick={openCartCheckout} disabled={cartDetailedItems.length === 0} className="w-full">
+              Checkout Cart
+            </Button>
+          </CardContent>
+        </Card>
+
+        {(selectedProduct || isCartCheckoutOpen) && (
           <Card className="shadow-medium">
             <CardContent className="p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-foreground">Checkout</h2>
-                <Button variant="ghost" onClick={() => setSelectedProduct(null)}>Close</Button>
+                <Button variant="ghost" onClick={() => { setSelectedProduct(null); setIsCartCheckoutOpen(false); }}>Close</Button>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -435,7 +529,7 @@ export default function PublicStorePage() {
                 </>
               )}
 
-              {checkoutStep === 2 && selectedProduct.type === 'physical' && (
+              {checkoutStep === 2 && ((!isServiceCheckout && cartHasPhysical) || (isServiceCheckout && selectedProduct?.type === 'physical')) && (
                 <Textarea
                   label="Delivery address"
                   value={buyer.address}
@@ -444,7 +538,7 @@ export default function PublicStorePage() {
                 />
               )}
 
-              {checkoutStep === 2 && selectedProduct.type === 'service' && (
+              {checkoutStep === 2 && isServiceCheckout && selectedProduct?.type === 'service' && (
                 <div className="space-y-3">
                   <Textarea
                     label="Booking notes (optional)"
@@ -577,23 +671,29 @@ export default function PublicStorePage() {
                 </div>
               )}
 
-              {checkoutStep === 2 && selectedProduct.type === 'digital' && (
+              {checkoutStep === 2 && ((!isServiceCheckout && !cartHasPhysical) || (isServiceCheckout && selectedProduct?.type === 'digital')) && (
                 <div className="rounded-xl border border-border bg-card/40 p-4 text-sm text-text-secondary">
-                  No extra details needed for digital products. Continue to review.
+                  No extra details needed. Continue to review.
                 </div>
               )}
 
               {checkoutStep === 3 && (
                 <div className="rounded-xl border border-border bg-card/40 p-4 space-y-2 text-sm">
-                  <p><span className="text-text-secondary">Product:</span> <span className="text-foreground font-medium">{selectedProduct.title}</span></p>
+                  {isServiceCheckout && selectedProduct ? (
+                    <p><span className="text-text-secondary">Product:</span> <span className="text-foreground font-medium">{selectedProduct.title}</span></p>
+                  ) : (
+                    <p><span className="text-text-secondary">Items:</span> <span className="text-foreground font-medium">{cartDetailedItems.length}</span></p>
+                  )}
                   <p><span className="text-text-secondary">Buyer:</span> <span className="text-foreground">{buyer.email}</span></p>
-                  {selectedProduct.type === 'service' && selectedSlot && (
+                  {isServiceCheckout && selectedProduct?.type === 'service' && selectedSlot && (
                     <p><span className="text-text-secondary">Slot:</span> <span className="text-foreground">{new Date(selectedSlot.start).toLocaleString()}</span></p>
                   )}
-                  {selectedProduct.type === 'physical' && buyer.address && (
+                  {((isServiceCheckout && selectedProduct?.type === 'physical') || (!isServiceCheckout && cartHasPhysical)) && buyer.address && (
                     <p><span className="text-text-secondary">Address:</span> <span className="text-foreground">{buyer.address}</span></p>
                   )}
-                  <p className="pt-2 border-t border-border"><span className="text-text-secondary">Amount:</span> <span className="text-foreground font-semibold">₦{selectedProduct.price.toLocaleString()}</span></p>
+                  <p className="pt-2 border-t border-border"><span className="text-text-secondary">Subtotal:</span> <span className="text-foreground font-semibold">₦{(isServiceCheckout && selectedProduct ? selectedProduct.price : cartSubtotal).toLocaleString()}</span></p>
+                  <p><span className="text-text-secondary">Platform Fee (2.5%):</span> <span className="text-foreground">₦{(isServiceCheckout ? servicePlatformFee : cartPlatformFee).toLocaleString()}</span></p>
+                  <p><span className="text-text-secondary">Total Payable:</span> <span className="text-foreground font-semibold">₦{(isServiceCheckout ? serviceTotal : cartTotal).toLocaleString()}</span></p>
                 </div>
               )}
 

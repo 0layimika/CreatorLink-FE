@@ -14,6 +14,7 @@ function OrderContent() {
   const [error, setError] = useState<string | null>(null);
   const [orderData, setOrderData] = useState<any>(null);
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
+  const [downloadTokens, setDownloadTokens] = useState<string[]>([]);
   const [downloadLoading, setDownloadLoading] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ function OrderContent() {
           const data: any = res.data;
           setOrderData(data.order);
           setDownloadToken(data.download_token || null);
+          setDownloadTokens(Array.isArray(data.download_tokens) ? data.download_tokens.map((t: any) => t.token) : []);
         } else {
           throw new Error(res.message || 'Failed to load order');
         }
@@ -41,11 +43,12 @@ function OrderContent() {
     fetchOrder();
   }, [reference]);
 
-  const handleDownload = async () => {
-    if (!downloadToken) return;
+  const handleDownload = async (token?: string) => {
+    const activeToken = token || downloadToken;
+    if (!activeToken) return;
     setDownloadLoading(true);
     try {
-      const response = await storeApi.download(downloadToken);
+      const response = await storeApi.download(activeToken);
       if (response.success && response.data) {
         const data: any = response.data;
         if (data.file_url) {
@@ -97,11 +100,14 @@ function OrderContent() {
           </div>
 
           <div className="border-t border-border pt-4 space-y-2 text-sm text-text-secondary">
-            {orderData.product?.title && (
-              <p>Product: {orderData.product.title}</p>
+            {orderData.product?.title && <p>Product: {orderData.product.title}</p>}
+            {Array.isArray(orderData.items) && orderData.items.length > 0 && (
+              <p>Items: {orderData.items.length}</p>
             )}
             <p>Reference: <span className="font-mono">{orderData.reference}</span></p>
-            <p>Amount: ₦{Number(orderData.amount).toLocaleString()}</p>
+            <p>Subtotal: ₦{Number(orderData.subtotal ?? orderData.amount).toLocaleString()}</p>
+            <p>Platform Fee (2.5%): ₦{Number(orderData.platform_fee ?? 0).toLocaleString()}</p>
+            <p>Total: ₦{Number(orderData.total ?? orderData.amount).toLocaleString()}</p>
             <p>Buyer Email: {orderData.buyer_email}</p>
           </div>
 
@@ -110,6 +116,15 @@ function OrderContent() {
               {downloadLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               Download
             </Button>
+          )}
+          {downloadTokens.length > 1 && orderData.status === 'paid' && (
+            <div className="space-y-2">
+              {downloadTokens.map((token, idx) => (
+                <Button key={`${token}-${idx}`} variant="outline" onClick={() => { void handleDownload(token); }} className="w-full">
+                  Download item {idx + 1}
+                </Button>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

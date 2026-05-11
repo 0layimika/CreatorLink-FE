@@ -132,6 +132,8 @@ export interface StoreProduct {
   buffer_minutes?: number | null;
   timezone?: string | null;
   requires_address?: boolean;
+  track_inventory?: boolean;
+  stock_quantity?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -149,13 +151,31 @@ export interface StoreOrder {
   delivery_address?: Record<string, any> | null;
   status: StoreOrderStatus;
   amount: number;
+  subtotal?: number;
+  total?: number;
+  item_count?: number;
+  platform_fee?: number;
+  platform_fee_minor?: number;
   currency: string;
   reference: string;
   provider: string;
   provider_reference?: string | null;
   metadata?: Record<string, any> | null;
+  items?: StoreOrderItem[];
   created_at?: string;
   updated_at?: string;
+}
+
+export interface StoreOrderItem {
+  id: number;
+  order_id: number;
+  product_id: number;
+  title_snapshot: string;
+  type_snapshot: StoreProductType;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+  currency: string;
 }
 
 export type ServiceBookingStatus = 'hold' | 'confirmed' | 'expired' | 'cancelled';

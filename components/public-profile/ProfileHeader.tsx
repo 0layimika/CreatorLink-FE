@@ -1,14 +1,13 @@
-import { BadgeCheck, ShoppingBag } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import type { User } from '@/types';
 
 interface ProfileHeaderProps {
   user: User;
   textColor?: string;
-  storeUrl?: string | null;
 }
 
-export function ProfileHeader({ user, textColor, storeUrl }: ProfileHeaderProps) {
+export function ProfileHeader({ user, textColor }: ProfileHeaderProps) {
   const style = textColor ? { color: textColor } : undefined;
   const mutedStyle = textColor ? { color: `${textColor}CC` } : undefined;
   return (
@@ -28,16 +27,6 @@ export function ProfileHeader({ user, textColor, storeUrl }: ProfileHeaderProps)
         <p style={textColor ? mutedStyle : undefined} className={!textColor ? 'text-text-secondary' : ''}>
           @{user.username}
         </p>
-        {storeUrl && (
-          <a
-            href={storeUrl}
-            className="inline-flex items-center text-xs sm:text-sm px-3 py-1.5 rounded-full border border-primary/50 bg-primary/20 text-primary shadow-soft hover:bg-primary/30 transition-colors"
-            style={textColor ? { color: textColor, borderColor: `${textColor}99`, backgroundColor: `${textColor}1F` } : undefined}
-          >
-            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
-            Visit Store
-          </a>
-        )}
       </div>
       {user.bio && (
         <p className={`text-sm mt-3 max-w-md mx-auto ${!textColor ? 'text-text-secondary' : ''}`} style={textColor ? mutedStyle : undefined}>

@@ -16,6 +16,7 @@ function StorePaymentContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
+  const [downloadTokens, setDownloadTokens] = useState<Array<{ token: string; product_id?: number | null }>>([]);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadLoading, setDownloadLoading] = useState(false);
 
@@ -31,12 +32,15 @@ function StorePaymentContent() {
         const response = await storeApi.verifyPurchase(reference);
         if (response.success && response.data) {
           const payload: any = response.data;
-          if (payload.status === 'paid') {
-            setStatus('success');
-            if (payload.download_token) {
-              setDownloadToken(payload.download_token);
-            }
-          } else if (payload.status === 'failed') {
+            if (payload.status === 'paid') {
+              setStatus('success');
+              if (payload.download_token) {
+                setDownloadToken(payload.download_token);
+              }
+              if (Array.isArray(payload.download_tokens)) {
+                setDownloadTokens(payload.download_tokens.map((t: any) => ({ token: t.token, product_id: t.product_id })));
+              }
+            } else if (payload.status === 'failed') {
             setStatus('failed');
             setError('Payment was not successful');
           } else {
@@ -55,11 +59,12 @@ function StorePaymentContent() {
     verifyPayment();
   }, [reference]);
 
-  const handleDownload = async () => {
-    if (!downloadToken) return;
+  const handleDownload = async (token?: string) => {
+    const activeToken = token || downloadToken;
+    if (!activeToken) return;
     setDownloadLoading(true);
     try {
-      const response = await storeApi.download(downloadToken);
+      const response = await storeApi.download(activeToken);
       if (response.success && response.data) {
         const data: any = response.data;
         setDownloadUrl(data.file_url);
@@ -108,6 +113,15 @@ function StorePaymentContent() {
                   {downloadLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                   Download
                 </Button>
+              )}
+              {downloadTokens.length > 1 && (
+                <div className="space-y-2">
+                  {downloadTokens.map((token, idx) => (
+                    <Button key={`${token.token}-${idx}`} variant="outline" onClick={() => { void handleDownload(token.token); }} className="w-full">
+                      Download item {idx + 1}
+                    </Button>
+                  ))}
+                </div>
               )}
               <div className="space-y-3 mt-4">
                 {reference && (

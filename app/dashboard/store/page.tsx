@@ -26,6 +26,8 @@ const defaultProduct = {
   buffer_minutes: 0,
   timezone: 'Africa/Lagos',
   requires_address: false,
+  track_inventory: true,
+  stock_quantity: 0,
 };
 
 const weekdays = [
@@ -185,6 +187,8 @@ export default function StoreDashboardPage() {
         buffer_minutes: productForm.type === 'service' ? productForm.buffer_minutes : null,
         timezone: productForm.type === 'service' ? productForm.timezone : null,
         requires_address: productForm.type === 'physical' ? productForm.requires_address : false,
+        track_inventory: productForm.type === 'physical' ? productForm.track_inventory : false,
+        stock_quantity: productForm.type === 'physical' ? productForm.stock_quantity : null,
       });
 
       if (response.success) {
@@ -580,14 +584,30 @@ export default function StoreDashboardPage() {
           )}
 
           {productForm.type === 'physical' && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={productForm.requires_address}
-                onChange={(e) => setProductForm((prev) => ({ ...prev, requires_address: e.target.checked }))}
+            <div className="space-y-3">
+              <Input
+                label="Available Quantity"
+                type="number"
+                value={productForm.stock_quantity ?? 0}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, stock_quantity: Math.max(0, Number(e.target.value || 0)) }))}
               />
-              <span>Require delivery address from buyer</span>
-            </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={productForm.track_inventory}
+                  onChange={(e) => setProductForm((prev) => ({ ...prev, track_inventory: e.target.checked }))}
+                />
+                <span>Track inventory for this product</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={productForm.requires_address}
+                  onChange={(e) => setProductForm((prev) => ({ ...prev, requires_address: e.target.checked }))}
+                />
+                <span>Require delivery address from buyer</span>
+              </label>
+            </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -709,6 +729,7 @@ export default function StoreDashboardPage() {
                       <p className="text-sm font-medium text-foreground">{product.title}</p>
                       <p className="text-xs text-text-secondary">
                         {product.type} • ₦{product.price.toLocaleString()}
+                        {product.type === 'physical' ? ` • Stock: ${product.stock_quantity ?? 0}` : ''}
                       </p>
                     </div>
                   </div>
