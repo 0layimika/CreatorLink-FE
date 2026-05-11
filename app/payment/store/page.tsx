@@ -109,7 +109,7 @@ function StorePaymentContent() {
                 Your order has been confirmed.
               </p>
               {downloadToken && (
-                <Button onClick={handleDownload} disabled={downloadLoading} className="w-full shadow-soft">
+                <Button onClick={() => { void handleDownload(); }} disabled={downloadLoading} className="w-full shadow-soft">
                   {downloadLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                   Download
                 </Button>
