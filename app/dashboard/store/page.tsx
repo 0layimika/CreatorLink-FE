@@ -58,6 +58,7 @@ export default function StoreDashboardPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [productForm, setProductForm] = useState(defaultProduct);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -156,7 +157,7 @@ export default function StoreDashboardPage() {
     }
   };
 
-  const handleCreateProduct = async () => {
+  const handleSaveProduct = async () => {
     setError(null);
     setSuccess(null);
     setIsSubmitting(true);
@@ -171,7 +172,7 @@ export default function StoreDashboardPage() {
         throw new Error('Services require a duration');
       }
 
-      const response = await storeApi.createProduct({
+      const payload = {
         type: productForm.type,
         title: productForm.title,
         description: productForm.description || null,
@@ -189,19 +190,78 @@ export default function StoreDashboardPage() {
         requires_address: productForm.type === 'physical' ? productForm.requires_address : false,
         track_inventory: productForm.type === 'physical' ? productForm.track_inventory : false,
         stock_quantity: productForm.type === 'physical' ? productForm.stock_quantity : null,
-      });
+      };
 
-      if (response.success) {
-        setSuccess('Product created successfully');
-        setProductForm(defaultProduct);
-        fetchAll();
+      if (editingProductId) {
+        const response = await storeApi.updateProduct(editingProductId, payload);
+        if (response.success) {
+          setSuccess('Product updated successfully');
+          setProductForm(defaultProduct);
+          setEditingProductId(null);
+          fetchAll();
+        } else {
+          throw new Error(response.message || 'Failed to update product');
+        }
       } else {
-        throw new Error(response.message || 'Failed to create product');
+        const response = await storeApi.createProduct(payload);
+        if (response.success) {
+          setSuccess('Product created successfully');
+          setProductForm(defaultProduct);
+          fetchAll();
+        } else {
+          throw new Error(response.message || 'Failed to create product');
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create product');
+      setError(err instanceof Error ? err.message : `Failed to ${editingProductId ? 'update' : 'create'} product`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEditProduct = (product: StoreProduct) => {
+    setEditingProductId(product.id);
+    setProductForm({
+      type: product.type,
+      title: product.title,
+      description: product.description || '',
+      price: product.price,
+      currency: product.currency || 'NGN',
+      cover_url: product.cover_url || '',
+      file_url: product.file_url || '',
+      file_id: product.file_id || '',
+      file_type: product.file_type || '',
+      file_size: product.file_size || undefined,
+      download_limit: product.download_limit || 3,
+      duration_minutes: product.duration_minutes || 30,
+      buffer_minutes: product.buffer_minutes || 0,
+      timezone: product.timezone || 'Africa/Lagos',
+      requires_address: product.requires_address || false,
+      track_inventory: product.track_inventory || false,
+      stock_quantity: product.stock_quantity || 0,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProductId(null);
+    setProductForm(defaultProduct);
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      const response = await storeApi.deleteProduct(id);
+      if (response.success) {
+        addToast('Product deleted successfully', 'success');
+        setProducts(prev => prev.filter(p => p.id !== id));
+      } else {
+        throw new Error(response.message || 'Failed to delete product');
+      }
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to delete product', 'error');
     }
   };
 
@@ -500,8 +560,8 @@ export default function StoreDashboardPage() {
       <Card className="shadow-soft">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Create Product or Service
+            {editingProductId ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+            {editingProductId ? 'Edit Product or Service' : 'Create Product or Service'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -675,10 +735,17 @@ export default function StoreDashboardPage() {
             )}
           </div>
 
-          <Button onClick={handleCreateProduct} disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-            Create
-          </Button>
+          <div className="flex gap-3">
+            <Button onClick={handleSaveProduct} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : editingProductId ? <Pencil className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              {editingProductId ? 'Save Changes' : 'Create'}
+            </Button>
+            {editingProductId && (
+              <Button variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -736,13 +803,32 @@ export default function StoreDashboardPage() {
                   <span className={`text-[10px] px-2 py-1 rounded-full border ${product.is_active ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/40 text-amber-300 bg-amber-500/10'}`}>
                     {product.is_active ? 'ACTIVE' : 'INACTIVE'}
                   </span>
-                  <Button
-                    size="sm"
-                    variant={product.is_active ? 'outline' : 'primary'}
-                    onClick={() => handleToggleProduct(product)}
-                  >
-                    {product.is_active ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={product.is_active ? 'outline' : 'primary'}
+                      onClick={() => handleToggleProduct(product)}
+                    >
+                      {product.is_active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditProduct(product)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-error border-error/20 hover:bg-error/10"
+                      onClick={() => handleDeleteProduct(product.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
