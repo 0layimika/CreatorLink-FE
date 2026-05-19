@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Loader2, Upload, Package, Calendar, ShoppingBag, Search, Pencil, Trash2, X, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Plus, Loader2, Upload, Package, ShoppingBag, Search, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
 import { mediaApi, storeApi } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-import type { StoreProduct, StoreOrder, ServiceBooking, ServiceAvailabilityWindow, StoreProductType } from '@/types';
+import type { StoreProduct, StoreOrder, StoreProductType } from '@/types';
 
 const defaultProduct = {
-  type: 'digital' as StoreProductType,
+  type: 'physical' as StoreProductType,
   title: '',
   description: '',
   price: 0,
@@ -30,28 +30,11 @@ const defaultProduct = {
   stock_quantity: 0,
 };
 
-const weekdays = [
-  { value: 0, label: 'Sunday' },
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-];
-
-const dayKeyFromIso = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
 export default function StoreDashboardPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [orders, setOrders] = useState<StoreOrder[]>([]);
-  const [bookings, setBookings] = useState<ServiceBooking[]>([]);
-  const [availability, setAvailability] = useState<ServiceAvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,48 +43,23 @@ export default function StoreDashboardPage() {
   const [productForm, setProductForm] = useState(defaultProduct);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [ordersOffset, setOrdersOffset] = useState(0);
-  const [bookingsOffset, setBookingsOffset] = useState(0);
   const pageSize = 10;
-  const [availabilityForm, setAvailabilityForm] = useState({
-    weekday: 1,
-    start_time: '',
-    end_time: '',
-    timezone: 'Africa/Lagos',
-  });
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
-  const [productFilter, setProductFilter] = useState<'all' | 'digital' | 'physical' | 'service'>('all');
+  const [productFilter, setProductFilter] = useState<'all' | 'physical'>('all');
   const [productQuery, setProductQuery] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'>('all');
   const [orderQuery, setOrderQuery] = useState('');
-  const [bookingStatusFilter, setBookingStatusFilter] = useState<'all' | 'hold' | 'confirmed' | 'expired' | 'cancelled'>('all');
-  const [bookingQuery, setBookingQuery] = useState('');
-  const [editingAvailabilityId, setEditingAvailabilityId] = useState<number | null>(null);
-  const [editingAvailabilityForm, setEditingAvailabilityForm] = useState({
-    weekday: 1,
-    start_time: '',
-    end_time: '',
-    timezone: 'Africa/Lagos',
-  });
-  const [ownerBlockServiceId, setOwnerBlockServiceId] = useState<number | null>(null);
-  const [ownerBlockSlots, setOwnerBlockSlots] = useState<Array<{ start: string; end: string }>>([]);
-  const [ownerBlockMonth, setOwnerBlockMonth] = useState<Date>(new Date());
-  const [ownerBlockSelectedDay, setOwnerBlockSelectedDay] = useState<string | null>(null);
-  const [ownerBlockSelectedSlot, setOwnerBlockSelectedSlot] = useState<{ start: string; end: string } | null>(null);
-  const [ownerBlockLoading, setOwnerBlockLoading] = useState(false);
-  const [timelineItem, setTimelineItem] = useState<{ type: 'order' | 'booking'; payload: StoreOrder | ServiceBooking } | null>(null);
+  const [timelineItem, setTimelineItem] = useState<{ type: 'order'; payload: StoreOrder } | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [productsRes, ordersRes, bookingsRes, availabilityRes] = await Promise.all([
+      const [productsRes, ordersRes] = await Promise.all([
         storeApi.listMyProducts({ limit: 50, offset: 0 }),
         storeApi.listOrders({ limit: pageSize, offset: 0 }),
-        storeApi.listBookings({ limit: pageSize, offset: 0 }),
-        storeApi.listAvailability(),
       ]);
 
       if (productsRes.success && productsRes.data) {
@@ -109,12 +67,6 @@ export default function StoreDashboardPage() {
       }
       if (ordersRes.success && ordersRes.data) {
         setOrders(ordersRes.data as StoreOrder[]);
-      }
-      if (bookingsRes.success && bookingsRes.data) {
-        setBookings(bookingsRes.data as ServiceBooking[]);
-      }
-      if (availabilityRes.success && availabilityRes.data) {
-        setAvailability(availabilityRes.data as ServiceAvailabilityWindow[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load store data');
@@ -127,33 +79,12 @@ export default function StoreDashboardPage() {
     fetchAll();
   }, []);
 
-  useEffect(() => {
-    if (!ownerBlockServiceId) return;
-    fetchOwnerSlots(ownerBlockServiceId).catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerBlockServiceId, ownerBlockMonth]);
-
   const handleCoverUpload = async (file: File) => {
     const response = await mediaApi.upload(file);
     if (response.success && response.data?.url) {
       setProductForm((prev) => ({ ...prev, cover_url: response.data!.url }));
     } else {
       throw new Error('Failed to upload cover');
-    }
-  };
-
-  const handleFileUpload = async (file: File) => {
-    const response = await mediaApi.upload(file);
-    if (response.success && response.data?.url) {
-      setProductForm((prev) => ({
-        ...prev,
-        file_url: response.data!.url,
-        file_id: response.data!.fileId,
-        file_type: response.data!.fileType || '',
-        file_size: response.data!.size,
-      }));
-    } else {
-      throw new Error('Failed to upload file');
     }
   };
 
@@ -165,13 +96,6 @@ export default function StoreDashboardPage() {
       if (!productForm.title || productForm.price <= 0) {
         throw new Error('Title and price are required');
       }
-      if (productForm.type === 'digital' && !productForm.file_url) {
-        throw new Error('Digital products require a file');
-      }
-      if (productForm.type === 'service' && !productForm.duration_minutes) {
-        throw new Error('Services require a duration');
-      }
-
       const payload = {
         type: productForm.type,
         title: productForm.title,
@@ -179,14 +103,14 @@ export default function StoreDashboardPage() {
         price: productForm.price,
         currency: productForm.currency,
         cover_url: productForm.cover_url || null,
-        download_limit: productForm.type === 'digital' ? (productForm.download_limit || 3) : undefined,
+        // download_limit: productForm.type === 'digital' ? (productForm.download_limit || 3) : undefined,
         file_id: productForm.file_id || null,
         file_url: productForm.file_url || null,
         file_type: productForm.file_type || null,
         file_size: productForm.file_size ?? null,
-        duration_minutes: productForm.type === 'service' ? productForm.duration_minutes : null,
-        buffer_minutes: productForm.type === 'service' ? productForm.buffer_minutes : null,
-        timezone: productForm.type === 'service' ? productForm.timezone : null,
+        // duration_minutes: productForm.type === 'service' ? productForm.duration_minutes : null,
+        // buffer_minutes: productForm.type === 'service' ? productForm.buffer_minutes : null,
+        // timezone: productForm.type === 'service' ? productForm.timezone : null,
         requires_address: productForm.type === 'physical' ? productForm.requires_address : false,
         track_inventory: productForm.type === 'physical' ? productForm.track_inventory : false,
         stock_quantity: productForm.type === 'physical' ? productForm.stock_quantity : null,
@@ -283,15 +207,6 @@ export default function StoreDashboardPage() {
     }
   };
 
-  const loadMoreBookings = async () => {
-    const nextOffset = bookingsOffset + pageSize;
-    const res = await storeApi.listBookings({ limit: pageSize, offset: nextOffset });
-    if (res.success && res.data) {
-      setBookings((prev) => [...prev, ...(res.data as ServiceBooking[])]);
-      setBookingsOffset(nextOffset);
-    }
-  };
-
   const handleUpdateOrderStatus = async (orderId: number, status: 'cancelled' | 'refunded') => {
     try {
       const res = await storeApi.updateOrderStatus(orderId, status);
@@ -300,77 +215,6 @@ export default function StoreDashboardPage() {
       addToast('Order status updated', 'success');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to update order status', 'error');
-    }
-  };
-
-  const handleUpdateBookingStatus = async (bookingId: number, status: 'confirmed' | 'cancelled' | 'expired') => {
-    try {
-      const res = await storeApi.updateBookingStatus(bookingId, status);
-      if (!res.success) throw new Error(res.message || 'Failed to update booking status');
-      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-      addToast('Booking status updated', 'success');
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to update booking status', 'error');
-    }
-  };
-
-  const startEditAvailability = (window: ServiceAvailabilityWindow) => {
-    setEditingAvailabilityId(window.id);
-    setEditingAvailabilityForm({
-      weekday: window.weekday,
-      start_time: window.start_time,
-      end_time: window.end_time,
-      timezone: window.timezone,
-    });
-  };
-
-  const saveEditAvailability = async () => {
-    if (!editingAvailabilityId) return;
-    try {
-      const res = await storeApi.updateAvailability(editingAvailabilityId, editingAvailabilityForm);
-      if (!res.success || !res.data) throw new Error(res.message || 'Failed to update availability');
-      setAvailability((prev) =>
-        prev.map((w) => (w.id === editingAvailabilityId ? (res.data as ServiceAvailabilityWindow) : w))
-      );
-      setEditingAvailabilityId(null);
-      addToast('Availability updated', 'success');
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to update availability', 'error');
-    }
-  };
-
-  const deleteAvailability = async (id: number) => {
-    try {
-      const res = await storeApi.deleteAvailability(id);
-      if (!res.success) throw new Error(res.message || 'Failed to delete availability');
-      setAvailability((prev) => prev.filter((w) => w.id !== id));
-      addToast('Availability deleted', 'success');
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to delete availability', 'error');
-    }
-  };
-
-  const blockSelectedTime = async () => {
-    if (!ownerBlockServiceId || !ownerBlockSelectedSlot) {
-      addToast('Select a service and time to block', 'error');
-      return;
-    }
-    try {
-      setOwnerBlockLoading(true);
-      const res = await storeApi.blockServiceSlot({
-        service_id: ownerBlockServiceId,
-        slot_start: ownerBlockSelectedSlot.start,
-        slot_end: ownerBlockSelectedSlot.end,
-        notes: 'owner_block',
-      });
-      if (!res.success) throw new Error(res.message || 'Failed to block time');
-      addToast('Time blocked successfully', 'success');
-      await fetchOwnerSlots(ownerBlockServiceId);
-      await fetchAll();
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to block time', 'error');
-    } finally {
-      setOwnerBlockLoading(false);
     }
   };
 
@@ -399,94 +243,6 @@ export default function StoreDashboardPage() {
     });
   }, [orders, orderStatusFilter, orderQuery]);
 
-  const filteredBookings = useMemo(() => {
-    return bookings.filter((b) => {
-      const matchesStatus = bookingStatusFilter === 'all' ? true : b.status === bookingStatusFilter;
-      const q = bookingQuery.trim().toLowerCase();
-      const matchesQuery = q.length === 0
-        ? true
-        : (b.buyer_email || '').toLowerCase().includes(q) ||
-          new Date(b.slot_start).toLocaleString().toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
-    });
-  }, [bookings, bookingStatusFilter, bookingQuery]);
-
-  const serviceProducts = useMemo(
-    () => products.filter((p) => p.type === 'service'),
-    [products]
-  );
-
-  useEffect(() => {
-    if (!ownerBlockServiceId && serviceProducts.length > 0) {
-      setOwnerBlockServiceId(serviceProducts[0].id);
-    }
-  }, [ownerBlockServiceId, serviceProducts]);
-
-  const ownerBlockSlotsByDay = useMemo(() => {
-    const grouped = new Map<string, Array<{ start: string; end: string }>>();
-    ownerBlockSlots.forEach((slot) => {
-      const key = dayKeyFromIso(slot.start);
-      const current = grouped.get(key) || [];
-      current.push(slot);
-      grouped.set(key, current);
-    });
-    return grouped;
-  }, [ownerBlockSlots]);
-
-  const ownerBlockAvailableDays = useMemo(
-    () => Array.from(ownerBlockSlotsByDay.keys()).sort(),
-    [ownerBlockSlotsByDay]
-  );
-
-  const ownerBlockTimesForDay = useMemo(() => {
-    if (!ownerBlockSelectedDay) return [];
-    const daySlots = ownerBlockSlotsByDay.get(ownerBlockSelectedDay) || [];
-    return [...daySlots].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  }, [ownerBlockSelectedDay, ownerBlockSlotsByDay]);
-
-  const ownerBlockMonthGrid = useMemo(() => {
-    const year = ownerBlockMonth.getFullYear();
-    const month = ownerBlockMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const firstWeekday = firstDay.getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: Array<{ date: Date; key: string; inMonth: boolean }> = [];
-
-    for (let i = 0; i < firstWeekday; i += 1) {
-      const d = new Date(year, month, i - firstWeekday + 1);
-      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: false });
-    }
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const d = new Date(year, month, day);
-      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: true });
-    }
-    while (cells.length % 7 !== 0) {
-      const d = new Date(year, month + 1, cells.length - (firstWeekday + daysInMonth) + 1);
-      cells.push({ date: d, key: dayKeyFromIso(d.toISOString()), inMonth: false });
-    }
-    return cells;
-  }, [ownerBlockMonth]);
-
-  const fetchOwnerSlots = async (serviceId: number, monthDate?: Date) => {
-    const currentMonth = monthDate || ownerBlockMonth;
-    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59);
-    const res = await storeApi.listOwnerServiceSlots(serviceId, {
-      from: monthStart.toISOString(),
-      to: monthEnd.toISOString(),
-    });
-    if (res.success && res.data) {
-      const slots = ((res.data as any).slots || []) as Array<{ start: string; end: string }>;
-      setOwnerBlockSlots(slots);
-      setOwnerBlockSelectedSlot(null);
-      if (slots.length > 0) {
-        setOwnerBlockSelectedDay(dayKeyFromIso(slots[0].start));
-      } else {
-        setOwnerBlockSelectedDay(null);
-      }
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -504,7 +260,7 @@ export default function StoreDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Store</h1>
         <p className="text-text-secondary mt-1">
-          Manage products, services, and bookings for @{displayName}
+          Manage physical products and orders for @{displayName}
         </p>
       </div>
 
@@ -532,11 +288,11 @@ export default function StoreDashboardPage() {
           variant={activeTab === 'orders' ? 'primary' : 'outline'}
           onClick={() => setActiveTab('orders')}
         >
-          Orders & Bookings
+          Orders
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="rounded-xl border border-border bg-card/40 p-3">
           <p className="text-xs text-text-secondary">Products</p>
           <p className="text-xl font-semibold text-foreground">{products.length}</p>
@@ -549,10 +305,10 @@ export default function StoreDashboardPage() {
           <p className="text-xs text-text-secondary">Orders</p>
           <p className="text-xl font-semibold text-foreground">{orders.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/40 p-3">
+        {/* <div className="rounded-xl border border-border bg-card/40 p-3">
           <p className="text-xs text-text-secondary">Bookings</p>
           <p className="text-xl font-semibold text-foreground">{bookings.length}</p>
-        </div>
+        </div> */}
       </div>
 
       {activeTab === 'products' && (
@@ -561,7 +317,7 @@ export default function StoreDashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {editingProductId ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-            {editingProductId ? 'Edit Product or Service' : 'Create Product or Service'}
+            {editingProductId ? 'Edit Product' : 'Create Product'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -575,16 +331,16 @@ export default function StoreDashboardPage() {
                 }
                 className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
               >
-                <option value="digital">Digital product</option>
+                {/* <option value="digital">Digital product</option> */}
                 <option value="physical">Physical product</option>
-                <option value="service">Service (booking)</option>
+                {/* <option value="service">Service (booking)</option> */}
               </select>
             </label>
             <Input
               label="Title"
               value={productForm.title}
               onChange={(e) => setProductForm((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="Product or service name"
+              placeholder="Product name"
             />
           </div>
           <Textarea
@@ -606,17 +362,17 @@ export default function StoreDashboardPage() {
               value={productForm.currency}
               onChange={(e) => setProductForm((prev) => ({ ...prev, currency: e.target.value }))}
             />
-            {productForm.type === 'service' && (
+            {/* {productForm.type === 'service' && (
               <Input
                 label="Duration (minutes)"
                 type="number"
                 value={productForm.duration_minutes || 30}
                 onChange={(e) => setProductForm((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }))}
               />
-            )}
+            )} */}
           </div>
 
-          {productForm.type === 'service' && (
+          {/* {productForm.type === 'service' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Buffer (minutes)"
@@ -630,9 +386,9 @@ export default function StoreDashboardPage() {
                 onChange={(e) => setProductForm((prev) => ({ ...prev, timezone: e.target.value }))}
               />
             </div>
-          )}
+          )} */}
 
-          {productForm.type === 'digital' && (
+          {/* {productForm.type === 'digital' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Download limit"
@@ -641,7 +397,7 @@ export default function StoreDashboardPage() {
                 onChange={(e) => setProductForm((prev) => ({ ...prev, download_limit: Number(e.target.value) }))}
               />
             </div>
-          )}
+          )} */}
 
           {productForm.type === 'physical' && (
             <div className="space-y-3">
@@ -704,7 +460,7 @@ export default function StoreDashboardPage() {
               )}
             </div>
 
-            {productForm.type === 'digital' && (
+            {/* {productForm.type === 'digital' && (
               <div>
                 <p className="text-sm text-text-secondary mb-2">Digital file</p>
                 <input
@@ -732,7 +488,7 @@ export default function StoreDashboardPage() {
                   </p>
                 )}
               </div>
-            )}
+            )} */}
           </div>
 
           <div className="flex gap-3">
@@ -753,7 +509,7 @@ export default function StoreDashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Your Products & Services
+            Your Products
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -773,9 +529,9 @@ export default function StoreDashboardPage() {
               onChange={(e) => setProductFilter(e.target.value as typeof productFilter)}
             >
               <option value="all">All types</option>
-              <option value="digital">Digital</option>
               <option value="physical">Physical</option>
-              <option value="service">Service</option>
+              {/* <option value="digital">Digital</option> */}
+              {/* <option value="service">Service</option> */}
             </select>
           </div>
           {filteredProducts.length === 0 ? (
@@ -836,7 +592,7 @@ export default function StoreDashboardPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-soft">
+      {/* <Card className="shadow-soft">
         <CardHeader>
           <CardTitle>Availability Windows</CardTitle>
         </CardHeader>
@@ -1072,11 +828,12 @@ export default function StoreDashboardPage() {
           )}
         </CardContent>
       </Card>
+      */}
       </>
       )}
 
       {activeTab === 'orders' && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Card className="shadow-soft">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1188,7 +945,7 @@ export default function StoreDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-soft">
+        {/* <Card className="shadow-soft">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
@@ -1273,7 +1030,7 @@ export default function StoreDashboardPage() {
               </Button>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
       )}
 
@@ -1282,7 +1039,7 @@ export default function StoreDashboardPage() {
           <div className="w-full max-w-md h-full bg-background border-l border-border p-5 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">
-                {timelineItem.type === 'order' ? 'Order Timeline' : 'Booking Timeline'}
+                {timelineItem.type === 'order' ? 'Order Timeline' : 'Timeline'}
               </h3>
               <Button variant="ghost" size="icon" onClick={() => setTimelineItem(null)}>
                 <X className="h-4 w-4" />
@@ -1307,27 +1064,7 @@ export default function StoreDashboardPage() {
                   ));
                 })()}
               </div>
-            ) : (
-              <div className="space-y-3 text-sm">
-                {(() => {
-                  const booking = timelineItem.payload as ServiceBooking;
-                  const events = [
-                    { label: 'Booking created', at: booking.created_at },
-                    { label: `Status: ${booking.status}`, at: booking.updated_at || booking.created_at },
-                    { label: 'Slot start', at: booking.slot_start },
-                    { label: 'Slot end', at: booking.slot_end },
-                  ];
-                  return events.map((event, idx) => (
-                    <div key={`${event.label}-${idx}`} className="rounded-lg border border-border p-3">
-                      <p className="text-foreground font-medium">{event.label}</p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        {event.at ? new Date(event.at).toLocaleString() : 'N/A'}
-                      </p>
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
