@@ -399,17 +399,23 @@ export default function PublicStorePage() {
     );
   }
 
-  if (error || !store) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-text-secondary">{error || 'Store not found'}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-soft px-4 py-8 sm:py-10">
       <div className="max-w-5xl mx-auto space-y-8">
+        {error && (
+          <div className="rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
+        )}
+
+        {!store ? (
+          <Card className="shadow-soft">
+            <CardContent className="p-6 text-center text-text-secondary">
+              Store not found.
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">{storeTitle}</h1>
           <p className="text-text-secondary">@{store.creator.username} • Storefront</p>
@@ -455,8 +461,8 @@ export default function PublicStorePage() {
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-base font-semibold text-foreground">Cart</p>
-              <p className="text-sm text-text-secondary">{cartDetailedItems.length} item types</p>
-            </div>
+                <p className="text-sm text-text-secondary">{cartDetailedItems.length} item types</p>
+              </div>
             {cartDetailedItems.length === 0 ? (
               <p className="text-sm text-text-secondary">Your cart is empty.</p>
             ) : (
@@ -483,10 +489,11 @@ export default function PublicStorePage() {
             <Button onClick={openCartCheckout} disabled={cartDetailedItems.length === 0} className="w-full">
               Checkout Cart
             </Button>
-          </CardContent>
-        </Card>
-
-        {(selectedProduct || isCartCheckoutOpen) && (
+            </CardContent>
+          </Card>
+          </>
+        )}
+        {store && (selectedProduct || isCartCheckoutOpen) && (
           <Card className="shadow-medium">
             <CardContent className="p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
