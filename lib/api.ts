@@ -519,6 +519,8 @@ export const storeApi = {
         stock_quantity?: number | null;
     }>) => api.patch(`/store/products/${id}`, data),
 
+    deleteProduct: (id: number) => api.delete(`/store/products/${id}`),
+
     listMyProducts: (params?: { limit?: number; offset?: number }) => {
         const queryParams = new URLSearchParams();
         if (params?.limit) queryParams.append('limit', params.limit.toString());
