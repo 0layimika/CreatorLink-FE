@@ -22,8 +22,8 @@ interface MiniNavbarProps {
 }
 
 const AnimatedNavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
-  const defaultTextColor = 'text-gray-300';
-  const hoverTextColor = 'text-white';
+  const defaultTextColor = 'text-text-secondary';
+  const hoverTextColor = 'text-foreground';
   const textSizeClass = 'text-sm';
 
   return (
@@ -45,10 +45,10 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
 
   const logoElement = (
     <div className="relative w-5 h-5 flex items-center justify-center">
-      <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 top-0 left-1/2 transform -translate-x-1/2 opacity-80" />
-      <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 left-0 top-1/2 transform -translate-y-1/2 opacity-80" />
-      <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 right-0 top-1/2 transform -translate-y-1/2 opacity-80" />
-      <span className="absolute w-1.5 h-1.5 rounded-full bg-gray-200 bottom-0 left-1/2 transform -translate-x-1/2 opacity-80" />
+      <span className="absolute w-1.5 h-1.5 rounded-full bg-foreground top-0 left-1/2 transform -translate-x-1/2 opacity-80" />
+      <span className="absolute w-1.5 h-1.5 rounded-full bg-foreground left-0 top-1/2 transform -translate-y-1/2 opacity-80" />
+      <span className="absolute w-1.5 h-1.5 rounded-full bg-foreground right-0 top-1/2 transform -translate-y-1/2 opacity-80" />
+      <span className="absolute w-1.5 h-1.5 rounded-full bg-foreground bottom-0 left-1/2 transform -translate-x-1/2 opacity-80" />
     </div>
   );
 
@@ -58,7 +58,7 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
         flex flex-col items-center
         pl-5 pr-5 py-2.5 backdrop-blur-xl
         ${isOpen ? 'rounded-xl' : 'rounded-full'}
-        border border-[#333] bg-[#11131ab3]
+        border border-border bg-card/90
         w-[calc(100%-2rem)] sm:w-auto
         transition-[border-radius] duration-300 ease-in-out`}
     >
@@ -79,7 +79,7 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
         <div className="hidden sm:flex items-center gap-2 sm:gap-3">
           {actions.map((action) => {
             const className =
-              'px-4 py-2 sm:px-3 text-xs sm:text-sm border border-[#333] bg-[rgba(31,31,31,0.62)] text-gray-300 rounded-full hover:border-white/50 hover:text-white transition-colors duration-200 w-full sm:w-auto';
+              'px-4 py-2 sm:px-3 text-xs sm:text-sm border border-border bg-background text-text-secondary rounded-full hover:border-primary/50 hover:text-foreground transition-colors duration-200 w-full sm:w-auto';
 
             if (action.href) {
               return (
@@ -98,7 +98,7 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
         </div>
 
         <button
-          className="sm:hidden flex items-center justify-center w-8 h-8 text-gray-300 focus:outline-none"
+          className="sm:hidden flex items-center justify-center w-8 h-8 text-text-secondary focus:outline-none"
           onClick={toggleMenu}
           aria-label={isOpen ? 'Close Menu' : 'Open Menu'}
         >
@@ -121,7 +121,7 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
         {links.length > 0 && (
           <nav className="flex flex-col items-center space-y-4 text-base w-full">
             {links.map((link) => (
-              <a key={link.href} href={link.href} className="text-gray-300 hover:text-white transition-colors w-full text-center">
+              <a key={link.href} href={link.href} className="text-text-secondary hover:text-foreground transition-colors w-full text-center">
                 {link.label}
               </a>
             ))}
@@ -131,7 +131,7 @@ export function MiniNavbar({ links = [], actions = [], brand, showGlyph = true }
         <div className="flex flex-col items-center space-y-3 mt-4 w-full">
           {actions.map((action) => {
             const className =
-              'px-4 py-2 text-sm border border-[#333] bg-[rgba(31,31,31,0.62)] text-gray-300 rounded-full hover:border-white/50 hover:text-white transition-colors duration-200 w-full text-center';
+              'px-4 py-2 text-sm border border-border bg-background text-text-secondary rounded-full hover:border-primary/50 hover:text-foreground transition-colors duration-200 w-full text-center';
 
             if (action.href) {
               return (

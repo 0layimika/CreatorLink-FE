@@ -71,12 +71,12 @@ export function Hero() {
                     </div>
                   ))}
                 </div>
-                <div className="rounded-2xl bg-[#1b2030] border border-[#2b3350] px-4 py-3">
+                <div className="rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3">
                   <p className="text-sm text-foreground">
                     Gift received: <span className="font-semibold">$25</span>
                   </p>
                 </div>
-                <div className="rounded-2xl bg-[#17282a] border border-[#2a4245] px-4 py-3">
+                <div className="rounded-2xl bg-cyan-50 border border-cyan-200 px-4 py-3">
                   <p className="text-sm text-foreground">
                     Today: <span className="font-semibold">128 profile visits</span>
                   </p>

@@ -1,9 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { MiniNavbar } from '@/components/ui/mini-navbar';
 import { useAuth } from '@/contexts/AuthContext';
-import { siteConfig } from '@/lib/constants';
+import { BrandWordmark } from '@/components/ui/BrandWordmark';
 
 export function Navbar() {
   const { isAuthenticated } = useAuth();
@@ -20,16 +19,7 @@ export function Navbar() {
       links={[]}
       actions={actions}
       showGlyph={false}
-      brand={
-        <Image
-          src={siteConfig.logoWordmark}
-          alt={siteConfig.name}
-          width={136}
-          height={32}
-          className="h-7 w-auto"
-          priority
-        />
-      }
+      brand={<BrandWordmark textClassName="font-display text-lg font-bold text-foreground" imageClassName="h-7 w-7 rounded-lg" />}
     />
   );
 }

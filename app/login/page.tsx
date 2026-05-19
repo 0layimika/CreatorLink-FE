@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { siteConfig } from '@/lib/constants';
+import { BrandWordmark } from '@/components/ui/BrandWordmark';
 import { authApi } from '@/lib/api';
 import { CheckCircle } from 'lucide-react';
 
@@ -58,14 +57,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2">
-            <Image
-              src={siteConfig.logoWordmark}
-              alt={siteConfig.name}
-              width={168}
-              height={40}
-              className="h-9 w-auto"
-            />
-          </Link>
+            <BrandWordmark textClassName="font-display text-2xl font-bold text-foreground" imageClassName="h-9 w-9 rounded-lg" /></Link>
           <h1 className="mt-6 text-2xl font-bold text-foreground">
             Welcome back
           </h1>

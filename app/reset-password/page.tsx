@@ -3,11 +3,10 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { siteConfig } from '@/lib/constants';
+import { BrandWordmark } from '@/components/ui/BrandWordmark';
 import { authApi } from '@/lib/api';
 import { Lock, CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
 
@@ -101,14 +100,7 @@ function ResetPasswordContent() {
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
         <Link href="/" className="inline-flex items-center space-x-2">
-          <Image
-            src={siteConfig.logoWordmark}
-            alt={siteConfig.name}
-            width={168}
-            height={40}
-            className="h-9 w-auto"
-          />
-        </Link>
+          <BrandWordmark textClassName="font-display text-2xl font-bold text-foreground" imageClassName="h-9 w-9 rounded-lg" /></Link>
         <h1 className="mt-6 text-2xl font-bold text-foreground">
           Reset your password
         </h1>

@@ -13,12 +13,12 @@ export function PhoneMockup({ user, links, profileConfig }: PhoneMockupProps) {
   const enabledLinks = links.filter((link) => link.enabled);
   const bgStyle: React.CSSProperties = profileConfig?.background_type === 'image' && profileConfig?.background_value
     ? { backgroundImage: `url(${profileConfig.background_value})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { backgroundColor: profileConfig?.background_value || '#faf9f7' };
-  const textColor = profileConfig?.text_color || '#1a1a1a';
+    : { backgroundColor: profileConfig?.background_value || '#04050a' };
+  const textColor = profileConfig?.text_color || '#ffffff';
   const supportButtonText = profileConfig?.support_button_text || 'Support me';
 
   return (
-    <div className="rounded-[3rem] border-4 border-border p-4 w-full max-w-[320px] mx-auto shadow-medium" style={bgStyle}>
+    <div data-theme="dark" className="rounded-[3rem] border-4 border-border p-4 w-full max-w-[320px] mx-auto shadow-medium" style={bgStyle}>
       <div className="rounded-[2.5rem] overflow-hidden shadow-soft bg-card/80 backdrop-blur" style={{ color: textColor }}>
         {/* Notch */}
         <div className="flex justify-center pt-3 pb-2">

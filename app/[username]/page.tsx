@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { unstable_noStore as noStore } from 'next/cache';
 // import { FileText } from 'lucide-react'; // Commented out - media kit coming soon
 import { ProfileHeader } from '@/components/public-profile/ProfileHeader';
 import { LinkButton } from '@/components/public-profile/LinkButton';
@@ -36,6 +37,7 @@ async function getStore(username: string) {
 }
 
 export async function generateMetadata({ params }: PublicProfilePageProps) {
+  noStore();
   const { username } = await params;
   const profile = await getProfile(username);
   console.log(profile);
@@ -50,6 +52,7 @@ export async function generateMetadata({ params }: PublicProfilePageProps) {
 }
 
 export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
+  noStore();
   const { username } = await params;
   const profile = await getProfile(username);
   const store = await getStore(username);
@@ -109,12 +112,27 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
           backgroundPosition: 'center',
         }
       : {
-          backgroundColor: profileConfig?.background_value || '#faf9f7',
+          backgroundColor: profileConfig?.background_value || '#04050a',
         }),
-    color: profileConfig?.text_color || '#1a1a1a',
+    color: profileConfig?.text_color || '#ffffff',
   };
 
-  const storeUrl = store?.products?.length ? `/${username}/store` : null;
+  const visibleStoreProducts = (store?.products || []).filter((product: any) => {
+    const isDeleted = Boolean(product?.deleted_at);
+    const isActive = product?.is_active !== false;
+    if (isDeleted || !isActive) return false;
+
+    const isPhysical = product?.type === 'physical';
+    if (!isPhysical) return true;
+
+    const trackInventory = product?.track_inventory !== false;
+    if (!trackInventory) return true;
+
+    const stock = Number(product?.stock_quantity ?? 0);
+    return stock > 0;
+  });
+
+  const storeUrl = visibleStoreProducts.length ? `/${username}/store` : null;
   const storeLink = storeUrl
     ? {
         id: 'store-link',
@@ -130,7 +148,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   const displayLinks = storeLink ? [storeLink, ...links] : links;
 
   return (
-    <div style={bgStyle}>
+    <div data-theme="dark" style={bgStyle}>
       <div className="max-w-lg mx-auto px-4 py-12">
         <ProfileHeader
           user={user}

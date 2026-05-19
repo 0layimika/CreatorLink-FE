@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { siteConfig } from '@/lib/constants';
 import { Avatar } from '@/components/ui/Avatar';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
@@ -80,6 +81,9 @@ export function Sidebar() {
       </nav>
 
       <div className="px-4 pb-4 space-y-1">
+        <div className="px-3 pb-2">
+          <ThemeToggle />
+        </div>
         {bottomItems.map((item) => {
           const Icon = item.icon;
 

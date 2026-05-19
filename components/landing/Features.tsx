@@ -12,7 +12,7 @@ const featureItems = [
       'No complicated setup. No awkward DMs. Just support.',
       'Turn fans into supporters in seconds.',
     ],
-    accent: 'bg-[#152632] border-[#2c5a70]',
+    accent: 'bg-sky-50 border-sky-200',
   },
   {
     area: 'md:[grid-area:1/7/2/13] xl:[grid-area:1/6/2/13]',
@@ -23,7 +23,7 @@ const featureItems = [
       'Social links • Products • Content • Projects • Communities',
       'Your entire digital presence. One link.',
     ],
-    accent: 'bg-[#141f2d] border-[#2f4f73]',
+    accent: 'bg-indigo-50 border-indigo-200',
   },
   {
     area: 'md:[grid-area:2/1/3/7] xl:[grid-area:2/1/3/5]',
@@ -34,7 +34,7 @@ const featureItems = [
       'Track: Page views, Link clicks, Engagement, Top performing links.',
       'Make smarter content decisions with real data.',
     ],
-    accent: 'bg-[#142323] border-[#2b4b4b]',
+    accent: 'bg-teal-50 border-teal-200',
   },
   {
     area: 'md:[grid-area:2/7/3/13] xl:[grid-area:2/5/3/9]',
@@ -45,7 +45,7 @@ const featureItems = [
       'Themes & colors, Layout control, Custom thumbnails, Creator branding.',
       'Your link page shouldn’t look like everyone else’s.',
     ],
-    accent: 'bg-[#222215] border-[#4c4c2e]',
+    accent: 'bg-amber-50 border-amber-200',
   },
   {
     area: 'md:[grid-area:3/1/4/7] xl:[grid-area:2/9/3/13]',
@@ -56,7 +56,7 @@ const featureItems = [
       'Add your QR code to events, posters, merch, and business cards.',
       'Scan → discover → support.',
     ],
-    accent: 'bg-[#13222d] border-[#2f566d]',
+    accent: 'bg-cyan-50 border-cyan-200',
   },
   {
     area: 'md:[grid-area:3/7/4/13] xl:[grid-area:3/1/4/13]',
@@ -65,7 +65,7 @@ const featureItems = [
     lines: [
       'Sell your digital and physical products. Sell services as well, and handle your appointments.',
     ],
-    accent: 'bg-[#1a2433] border-[#304968]',
+    accent: 'bg-blue-50 border-blue-200',
   },
 ];
 

@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { siteConfig } from '@/lib/constants';
 import { Avatar } from '@/components/ui/Avatar';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
@@ -108,6 +109,9 @@ export function MobileNav() {
             </nav>
 
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border space-y-1">
+              <div className="px-3 pb-2">
+                <ThemeToggle />
+              </div>
               <Link
                 href="/dashboard/settings"
                 onClick={() => setIsOpen(false)}
