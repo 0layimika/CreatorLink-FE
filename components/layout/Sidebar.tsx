@@ -1,123 +1,58 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import {
-  Home,
-  Link as LinkIcon,
-  BarChart3,
-  Wallet,
-  FileText,
-  ShoppingBag,
-  Settings,
-  LogOut,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { siteConfig } from '@/lib/constants';
+import { ExternalLink, LogOut } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { BrandWordmark } from '@/components/ui/BrandWordmark';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { dashboardNavItems, dashboardUtilityItems, isDashboardItemActive } from '@/components/dashboard/dashboard-navigation';
 import { useAuth } from '@/contexts/AuthContext';
-
-const navItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Links', href: '/dashboard/links', icon: LinkIcon },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
-  { name: 'Store', href: '/dashboard/store', icon: ShoppingBag },
-  { name: 'Media Kit', href: '/dashboard/media-kit', icon: FileText },
-];
-
-const bottomItems = [
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-];
+import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-
-  const displayName = user
-    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username
-    : 'Creator';
+  const { user, creator, logout } = useAuth();
+  const displayName = `${creator?.first_name || ''} ${creator?.last_name || ''}`.trim() || creator?.username || 'Creator';
 
   return (
-    <div className="flex flex-col h-full bg-card/80 backdrop-blur-md border-r border-border shadow-soft">
-      <div className="p-6">
-        <Link href="/" className="flex items-center space-x-2">
-          <Image
-            src={siteConfig.logo}
-            alt={siteConfig.name}
-            width={36}
-            height={36}
-            className="rounded-lg"
-          />
-          <span className="font-display text-xl font-bold text-foreground">
-            {siteConfig.name}
-          </span>
-        </Link>
-      </div>
+    <div className="flex h-full flex-col border-r border-white/10 bg-ink p-4 text-white">
+      <Link href="/" className="mb-8 px-3 py-3" aria-label="LinkVerse home">
+        <BrandWordmark textClassName="font-display text-xl font-black tracking-[-0.04em] text-white" imageClassName="h-8 w-8 rounded-xl" />
+      </Link>
 
-      <nav className="flex-1 px-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
+      <nav className="space-y-1" aria-label="Dashboard navigation">
+        {dashboardNavItems.map((item) => {
+          const active = isDashboardItemActive(pathname, item.href, 'exact' in item ? item.exact : false);
           const Icon = item.icon;
-
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all',
-                isActive
-                  ? 'bg-gradient-primary text-white shadow-soft'
-                  : 'text-text-secondary hover:bg-muted/80 hover:text-foreground'
-              )}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="font-medium">{item.name}</span>
+            <Link key={item.href} href={item.href} className={cn('flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition-colors', active ? 'bg-secondary text-ink' : 'text-white/60 hover:bg-white/8 hover:text-white')}>
+              <Icon className="h-5 w-5" />{item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="px-4 pb-4 space-y-1">
-        <div className="px-3 pb-2">
-          <ThemeToggle />
-        </div>
-        {bottomItems.map((item) => {
+      <div className="mt-auto space-y-1 pt-8">
+        {creator?.username && (
+          <Link href={`/${creator.username}`} target="_blank" className="mb-4 flex items-center justify-between rounded-2xl border border-white/15 bg-white/6 px-4 py-3 text-sm font-bold text-white hover:border-secondary/60">
+            View public page <ExternalLink className="h-4 w-4 text-secondary" />
+          </Link>
+        )}
+        {dashboardUtilityItems.map((item) => {
           const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-muted/80 hover:text-foreground transition-colors"
-            >
-              <Icon className="h-5 w-5" />
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          );
+          const active = isDashboardItemActive(pathname, item.href);
+          return <Link key={item.href} href={item.href} className={cn('flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold', active ? 'bg-white text-ink' : 'text-white/60 hover:bg-white/8 hover:text-white')}><Icon className="h-5 w-5" />{item.name}</Link>;
         })}
-        <button
-          onClick={logout}
-          className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-error/10 hover:text-error transition-colors w-full"
-        >
-          <LogOut className="h-5 w-5" />
-          <span className="font-medium">Log out</span>
-        </button>
+        <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-white/60 hover:bg-error/15 hover:text-white"><LogOut className="h-5 w-5" />Log out</button>
+        <div className="pt-3"><ThemeToggle /></div>
       </div>
 
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center space-x-3">
-          <Avatar name={displayName} size="md" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {displayName}
-            </p>
-            <p className="text-xs text-text-secondary truncate">
-              @{user?.username || 'creator'}
-            </p>
-          </div>
+      <div className="mt-5 flex items-center gap-3 border-t border-white/10 px-2 pt-5">
+        <Avatar name={displayName} src={creator?.avatar_url || user?.avatar} size="md" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-extrabold text-white">{displayName}</p>
+          <p className="truncate text-xs text-white/45">@{creator?.username}</p>
         </div>
       </div>
     </div>

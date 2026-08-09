@@ -1,234 +1,141 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Eye, MousePointer, Wallet, Copy, QrCode, Loader2 } from 'lucide-react';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { ActivityList } from '@/components/dashboard/ActivityList';
-import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { formatNumber, formatCurrency } from '@/lib/utils';
+import { useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, Banknote, BarChart3, Check, Copy, Eye, ExternalLink, Link2, MousePointer2, Palette, QrCode, ShoppingBag, Sparkles, UserRound, Wallet } from 'lucide-react';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { DashboardError, DashboardLoading, DashboardPageHeader, DashboardPanel, EmptyState, MetricCard, ProgressBar } from '@/components/dashboard/DashboardUI';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_BASE_URL } from '@/lib/api';
-import { useLinks } from '@/hooks/useLinks';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useLinks } from '@/hooks/useLinks';
 import { useWallet } from '@/hooks/useWallet';
-import type { Activity } from '@/types';
+import { useToast } from '@/contexts/ToastContext';
+import { API_BASE_URL } from '@/lib/api';
+import { formatCurrency, formatNumber } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const { links, isLoading: linksLoading } = useLinks();
-  const { overview, isLoading: analyticsLoading } = useAnalytics();
-  const { wallet, isLoading: walletLoading } = useWallet();
-
+  const { user, creator } = useAuth();
+  const { addToast } = useToast();
+  const { links, isLoading: linksLoading, error: linksError, refetch: refetchLinks } = useLinks();
+  const { overview, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalytics();
+  const { wallet, transactions, bankAccount, isLoading: walletLoading, error: walletError, refetch: refetchWallet } = useWallet();
   const [copied, setCopied] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
-  const [activities, setActivities] = useState<Activity[]>([
-    {
-      id: '1',
-      type: 'view',
-      message: 'Your profile is ready to receive views',
-      timestamp: 'Just now',
-    },
-  ]);
 
   const isLoading = linksLoading || analyticsLoading || walletLoading;
-  
-  const stats = {
-    totalViews: overview?.totalViews || 0,
-    totalClicks: overview?.totalClicks || 0,
-    totalEarnings: wallet?.balance || 0,
-    viewsChange: overview?.viewsChange || 0,
-    clicksChange: overview?.clicksChange || 0,
-    earningsChange: 0,
-  };
+  const firstName = creator?.first_name || user?.firstName || creator?.username || 'Creator';
+  const username = creator?.username || user?.username;
+  const activeLinks = links.filter((link) => link.enabled);
+  const pageCompletionItems = [
+    { label: 'Add a profile photo', done: Boolean(creator?.avatar_url), href: '/dashboard/settings', icon: UserRound },
+    { label: 'Write your bio', done: Boolean(creator?.bio?.trim()), href: '/dashboard/settings', icon: Sparkles },
+    { label: 'Publish your first link', done: links.length > 0, href: '/dashboard/links', icon: Link2 },
+    { label: 'Choose your page style', done: true, href: '/dashboard/links', icon: Palette },
+    { label: 'Connect a payout account', done: Boolean(bankAccount), href: '/dashboard/wallet', icon: Banknote },
+  ];
+  const completion = Math.round((pageCompletionItems.filter((item) => item.done).length / pageCompletionItems.length) * 100);
+  const error = linksError || analyticsError || walletError;
 
-  // Update activities based on real data
-  useEffect(() => {
-    const newActivities: Activity[] = [];
-
-    if (overview?.totalViews && overview.totalViews > 0) {
-      newActivities.push({
-        id: '1',
-        type: 'view',
-        message: `Your profile has ${overview.totalViews} total views`,
-        timestamp: 'All time',
-      });
-    }
-
-    if (overview?.totalClicks && overview.totalClicks > 0) {
-      newActivities.push({
-        id: '2',
-        type: 'click',
-        message: `Your links received ${overview.totalClicks} clicks`,
-        timestamp: 'All time',
-      });
-    }
-
-    if (wallet?.balance && wallet.balance > 0) {
-      newActivities.push({
-        id: '3',
-        type: 'tip',
-        message: `You have ₦${formatNumber(wallet.balance)} in your wallet`,
-        timestamp: 'Current balance',
-      });
-    }
-
-    if (newActivities.length > 0) {
-      setActivities(newActivities);
-    }
-  }, [overview, wallet]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const firstName = user?.firstName || user?.username || 'Creator';
-  const publicPageUrl = typeof window !== 'undefined' && user?.username
-    ? `${window.location.origin}/${user.username}`
-    : '';
-
-  const handleCopyLink = async () => {
-    if (!publicPageUrl) return;
+  const copyPublicLink = async () => {
+    if (!username) return;
     try {
-      await navigator.clipboard.writeText(publicPageUrl);
+      await navigator.clipboard.writeText(`${window.location.origin}/${username}`);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Fallback for older browsers
+      addToast('Could not copy your link. Try opening your public page instead.', 'error');
     }
   };
 
-  const handleDownloadQR = async () => {
-    if (!user?.username) return;
+  const downloadQr = async () => {
+    if (!username) return;
     setQrLoading(true);
     try {
-      const qrUrl = `${API_BASE_URL}/profile/${user.username}/qr`;
-      const res = await fetch(qrUrl);
-      if (!res.ok) throw new Error('Failed to generate QR code');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `creatorlink-${user.username}-qr.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const response = await fetch(`${API_BASE_URL}/profile/${username}/qr`);
+      if (!response.ok) throw new Error();
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `linkverse-${username}-qr.png`;
+      anchor.click();
+      URL.revokeObjectURL(blobUrl);
     } catch {
-      // Silent fail
+      addToast('Could not download your QR code. Please try again.', 'error');
     } finally {
       setQrLoading(false);
     }
   };
 
+  if (isLoading) return <DashboardLoading />;
+
   return (
-    <div className="space-y-8 animate-fade-up">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Welcome back, {firstName}
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Here&apos;s how your page is performing
-          </p>
-        </div>
-        {user?.username && publicPageUrl && (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <input
-                type="text"
-                readOnly
-                value={publicPageUrl}
-                className="flex-1 min-w-0 px-3 py-2 text-sm rounded-xl bg-card border border-border text-foreground truncate"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyLink}
-                className="shrink-0"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                {copied ? 'Copied!' : 'Copy'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadQR}
-                disabled={qrLoading}
-                className="shrink-0"
-              >
-                {qrLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <QrCode className="h-4 w-4 mr-2" />
-                )}
-                QR Code
-              </Button>
+    <div className="space-y-8">
+      <DashboardPageHeader
+        eyebrow="Your workspace"
+        title={`Hey ${firstName}, what are we making?`}
+        description="A quick look at your page, your audience and the things that need your attention."
+        actions={username && <ButtonLink href={`/${username}`} target="_blank" variant="outline"><ExternalLink className="h-4 w-4" />View page</ButtonLink>}
+      />
+
+      {error && <DashboardError message={error} onRetry={() => { void Promise.all([refetchLinks(), refetchAnalytics(), refetchWallet()]); }} />}
+
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="overflow-hidden rounded-[32px] border border-ink bg-primary p-6 text-white sm:p-8">
+          <div className="flex h-full flex-col justify-between gap-10">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-secondary">Your public page</p>
+              <h2 className="mt-4 max-w-2xl font-display text-4xl font-black leading-[0.95] tracking-[-0.055em] sm:text-5xl">Share the one link that does the most.</h2>
+            </div>
+            <div>
+              <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/25 bg-white/10 p-2 pl-4">
+                <p className="min-w-0 flex-1 truncate text-sm font-bold text-white/75">linkverse.live/{username}</p>
+                <Button type="button" variant="secondary" size="sm" onClick={copyPublicLink}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? 'Copied' : 'Copy'}</Button>
+              </div>
+              <button type="button" onClick={downloadQr} disabled={qrLoading} className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-white/70 hover:text-secondary disabled:opacity-50"><QrCode className="h-4 w-4" />{qrLoading ? 'Making your QR code…' : 'Download QR code'}</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard
-          title="Total Views"
-          value={formatNumber(stats.totalViews)}
-          change={stats.viewsChange}
-          icon={Eye}
-          iconColor="text-primary"
-        />
-        <StatCard
-          title="Total Clicks"
-          value={formatNumber(stats.totalClicks)}
-          change={stats.clicksChange}
-          icon={MousePointer}
-          iconColor="text-secondary"
-        />
-        <StatCard
-          title="Total Earnings"
-          value={formatCurrency(stats.totalEarnings)}
-          change={stats.earningsChange}
-          icon={Wallet}
-          iconColor="text-success"
-        />
-      </div>
+        <div className="rounded-[32px] border border-ink bg-secondary p-6 text-ink sm:p-8">
+          <div className="flex items-start justify-between"><p className="text-xs font-black uppercase tracking-[0.14em] opacity-60">Page setup</p><span className="font-display text-3xl font-black">{completion}%</span></div>
+          <ProgressBar value={completion} className="mt-5 bg-ink/15 [&>div]:bg-ink" />
+          <div className="mt-7 space-y-3">
+            {pageCompletionItems.filter((item) => !item.done).slice(0, 3).map((item) => { const Icon = item.icon; return <Link key={item.label} href={item.href} className="flex items-center justify-between rounded-2xl border border-ink/20 bg-white/45 px-4 py-3 text-sm font-extrabold hover:bg-white"><span className="flex items-center gap-2"><Icon className="h-4 w-4" />{item.label}</span><ArrowRight className="h-4 w-4" /></Link>; })}
+            {completion === 100 && <p className="rounded-2xl bg-white/45 p-4 text-sm font-extrabold">Your essentials are all set. Nice work.</p>}
+          </div>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display">Top Links</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {links.length > 0 ? (
-              <div className="space-y-4">
-                {links.slice(0, 4).map((link) => (
-                  <div
-                    key={link.id}
-                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {link.title}
-                      </p>
-                      <p className="text-xs text-text-secondary truncate">
-                        {link.url}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-text-secondary text-center py-4">
-                No links yet. Add your first link to get started.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Profile views" value={formatNumber(overview?.totalViews || 0)} change={overview?.viewsChange} icon={Eye} tone="white" />
+        <MetricCard label="Unique visitors" value={formatNumber(overview?.uniqueVisitors || 0)} note="This week" icon={UserRound} tone="pink" />
+        <MetricCard label="Link clicks" value={formatNumber(overview?.totalClicks || 0)} change={overview?.clicksChange} icon={MousePointer2} tone="lime" />
+        <MetricCard label="Available balance" value={formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')} note={`${formatCurrency(wallet?.pending || 0, wallet?.currency || 'NGN')} pending`} icon={Wallet} tone="ink" />
+      </section>
 
-        <ActivityList activities={activities} />
-      </div>
+      <section className="grid gap-4 xl:grid-cols-2">
+        <DashboardPanel title="Top links" description={`${activeLinks.length} active link${activeLinks.length === 1 ? '' : 's'} on your page`} action={<ButtonLink href="/dashboard/analytics" variant="ghost" size="sm">See analytics<ArrowRight className="h-4 w-4" /></ButtonLink>}>
+          {overview?.topLinks.length ? (
+            <div className="space-y-5">
+              {overview.topLinks.slice(0, 5).map((link, index) => {
+                const max = overview.topLinks[0]?.clicks || 1;
+                return <div key={link.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-muted text-xs font-black">{index + 1}</span><div className="min-w-0"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-extrabold text-foreground">{link.title}</p></div><ProgressBar value={(link.clicks / max) * 100} className="mt-2" /></div><span className="text-sm font-black text-foreground">{formatNumber(link.clicks)}</span></div>;
+              })}
+            </div>
+          ) : <EmptyState icon={BarChart3} title="No clicks to rank yet" description="Share your page and your top-performing links will appear here." actionHref="/dashboard/links" actionLabel="Manage your links" />}
+        </DashboardPanel>
+
+        <DashboardPanel title="Recent money activity" description="Your latest gifts, sales and withdrawals" action={<ButtonLink href="/dashboard/wallet" variant="ghost" size="sm">Open wallet<ArrowRight className="h-4 w-4" /></ButtonLink>}>
+          {transactions.length ? (
+            <div className="divide-y divide-border">
+              {transactions.slice(0, 5).map((transaction) => {
+                const incoming = transaction.type !== 'withdrawal';
+                return <div key={transaction.id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"><div className="min-w-0"><p className="truncate text-sm font-extrabold text-foreground">{transaction.description || (incoming ? 'Payment received' : 'Withdrawal')}</p><p className="mt-1 text-xs text-text-secondary">{new Date(transaction.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })} · {transaction.status}</p></div><p className={`shrink-0 text-sm font-black ${incoming ? 'text-success' : 'text-foreground'}`}>{incoming ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency)}</p></div>;
+              })}
+            </div>
+          ) : <EmptyState icon={ShoppingBag} title="No money activity yet" description="Gifts, store sales and withdrawals will show up here as they happen." actionHref="/dashboard/store" actionLabel="Set up your store" />}
+        </DashboardPanel>
+      </section>
     </div>
   );
 }

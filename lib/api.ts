@@ -1,3 +1,5 @@
+import type { SocialLink, StoreProduct } from '@/types';
+
 const getDefaultApiBaseUrl = () => {
     if (typeof window !== 'undefined') {
         const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -6,10 +8,27 @@ const getDefaultApiBaseUrl = () => {
         }
     }
 
+    if (process.env.NODE_ENV !== 'production') {
+        return 'http://localhost:8010/api/v1';
+    }
+
     return 'https://linkverse.pxxl.click/api/v1';
 };
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || getDefaultApiBaseUrl();
+export const API_BASE_URL = (
+    typeof window === 'undefined' ? process.env.SERVER_API_URL : undefined
+) || process.env.NEXT_PUBLIC_API_URL || getDefaultApiBaseUrl();
+
+export class ApiError extends Error {
+    constructor(
+        message: string,
+        public readonly status: number,
+        public readonly code?: string,
+    ) {
+        super(message);
+        this.name = 'ApiError';
+    }
+}
 
 interface ApiResponse<T = unknown> {
     success: boolean;
@@ -104,11 +123,12 @@ class ApiClient {
                     errorMessage = data.message;
                 }
 
+                const errorCode = typeof data.error === 'object' ? data.error?.code : undefined;
                 if (response.status === 401) {
-                    throw new Error('Your session has expired. Please log in again.');
+                    throw new ApiError('Your session has expired. Please log in again.', response.status, errorCode);
                 }
 
-                throw new Error(errorMessage);
+                throw new ApiError(errorMessage, response.status, errorCode);
             }
 
             return data;
@@ -165,10 +185,10 @@ export const api = new ApiClient(API_BASE_URL);
 // Auth API - matches backend structure
 export const authApi = {
     register: (data: { email: string; password: string; confirmPassword: string }) =>
-        api.post<{ user: unknown; verificationLink: string }>('/auth/register', data),
+        api.post<{ user: unknown }>('/auth/register', data),
 
     login: (data: { email: string; password: string }) =>
-        api.post<{ creator: unknown; token: string }>('/auth/login', data),
+        api.post<{ creator: unknown | null; token: string; user?: unknown }>('/auth/login', data),
 
     verify: (token: string) =>
         api.patch<{ user: unknown; token: string }>(`/auth/verify?token=${token}`),
@@ -188,10 +208,10 @@ export const authApi = {
 
 // Creator API - matches backend field names (first_name, last_name snake_case)
 export const creatorApi = {
-    create: (data: { username: string; first_name: string; last_name: string; bio?: string; avatar_url?: string }) =>
+    create: (data: { username: string; first_name: string; last_name: string; display_name?: string | null; bio?: string; avatar_url?: string }) =>
         api.post('/creator/new', data),
 
-    update: (data: { username?: string; first_name?: string; last_name?: string; bio?: string; avatar_url?: string }) =>
+    update: (data: { username?: string; first_name?: string; last_name?: string; display_name?: string | null; bio?: string; avatar_url?: string }) =>
         api.patch('/creator/update', data),
 };
 
@@ -202,15 +222,18 @@ export const linksApi = {
         title: string;
         url: string;
         icon: string | null;
+        thumbnail_url?: string | null;
+        display_type?: 'standard' | 'featured';
+        description?: string | null;
         clicks: number;
         is_active: boolean;
         position: number;
     }>>('/links'),
 
-    create: (data: { title: string; url: string; icon?: string; thumbnail_url?: string | null }) =>
+    create: (data: { title: string; url: string; icon?: string; thumbnail_url?: string | null; display_type?: 'standard' | 'featured'; description?: string | null }) =>
         api.post('/links', data),
 
-    update: (id: number, data: { title?: string; url?: string; icon?: string; thumbnail_url?: string | null; position?: number }) =>
+    update: (id: number, data: { title?: string; url?: string; icon?: string; thumbnail_url?: string | null; display_type?: 'standard' | 'featured'; description?: string | null; position?: number }) =>
         api.patch(`/links/${id}`, data),
 
     delete: (id: number) =>
@@ -228,31 +251,16 @@ export const linksApi = {
 
 // Analytics API
 export const analyticsApi = {
-    getOverview: (params?: { startDate?: string; endDate?: string }) => {
-        const queryParams = new URLSearchParams();
-        if (params?.startDate) queryParams.append('startDate', params.startDate);
-        if (params?.endDate) queryParams.append('endDate', params.endDate);
-        const query = queryParams.toString();
-        return api.get<{
-            totalViews: number;
-            totalClicks: number;
-            viewsChange: number;
-            clicksChange: number;
-            dailyStats: Array<{ date: string; views: number; clicks: number }>;
-            topLinks: Array<{ id: string; title: string; clicks: number }>;
-        }>(`/analytics/overview${query ? `?${query}` : ''}`);
+    getOverview: (period: 'today' | 'this_week' | 'this_month' | 'all_time' = 'this_week') => {
+        return api.get<unknown>(`/analytics/overview?period=${period}`);
     },
 
-    getLinkAnalytics: (linkId: string, params?: { startDate?: string; endDate?: string }) => {
-        const queryParams = new URLSearchParams();
-        if (params?.startDate) queryParams.append('startDate', params.startDate);
-        if (params?.endDate) queryParams.append('endDate', params.endDate);
-        const query = queryParams.toString();
-        return api.get(`/analytics/links/${linkId}${query ? `?${query}` : ''}`);
+    getLinkAnalytics: (linkId: string, period: 'today' | 'this_week' | 'this_month' | 'all_time' = 'this_week') => {
+        return api.get(`/analytics/links/${linkId}?period=${period}`);
     },
 
-    trackProfileView: (username: string, referrer?: string) =>
-        api.post(`/analytics/track/profile/${username}`, { referrer }),
+    trackProfileView: (username: string, attribution?: string) =>
+        api.post(`/analytics/track/profile/${username}${attribution ? `?${attribution}` : ''}`, {}),
 
     trackLinkClick: (linkId: string, referrer?: string) =>
         api.post(`/analytics/track/link/${linkId}`, { referrer }),
@@ -267,7 +275,7 @@ export const walletApi = {
         currency: string;
     }>('/wallet'),
 
-    getBalance: () => api.get<{ balance: number; pending: number; currency: string }>('/wallet/balance'),
+    getBalance: () => api.get<{ balance: number; pending: number; currency: string; wallets?: Array<{ id: number; balance: number; currency: string }> }>('/wallet/balance'),
 
     getTransactions: (params?: { page?: number; limit?: number }) => {
         const queryParams = new URLSearchParams();
@@ -291,7 +299,7 @@ export const walletApi = {
     getBanks: () => api.get<Array<{ code: string; name: string }>>('/wallet/banks'),
 
     resolveAccount: (accountNumber: string, bankCode: string) =>
-        api.get(`/wallet/resolve-account?account_number=${accountNumber}&bank_code=${bankCode}`),
+        api.get<{ account_name: string }>(`/wallet/resolve-account?account_number=${accountNumber}&bank_code=${bankCode}`),
 
     setBankAccount: (data: { account_number: string; bank_code: string; account_name: string }) =>
         api.post('/wallet/bank-account', data),
@@ -306,8 +314,8 @@ export const walletApi = {
         provider: string | null;
     }>('/wallet/bank-account'),
 
-    withdraw: (amount: number) =>
-        api.post('/wallet/withdraw', { amount }),
+    withdraw: (amount: number, currency: 'NGN' | 'USD' = 'NGN', password: string) =>
+        api.post('/wallet/withdraw', { amount, currency, password }),
 
     getWithdrawals: () => api.get('/wallet/withdrawals'),
 };
@@ -320,6 +328,7 @@ export const profileApi = {
             username: string;
             first_name: string;
             last_name: string;
+            display_name?: string | null;
             bio: string;
             avatar_url: string;
             profile_config: {
@@ -327,21 +336,43 @@ export const profileApi = {
                 background_value: string | null;
                 text_color: string | null;
                 support_button_text?: string | null;
+                accent_color?: string | null;
+                card_style?: 'solid' | 'outline' | 'glass' | null;
+                profile_alignment?: 'left' | 'center' | 'right' | null;
+                avatar_shape?: 'circle' | 'rounded' | null;
+                avatar_size?: 'small' | 'medium' | 'large' | null;
+                support_button_style?: 'solid' | 'outline' | null;
+                support_enabled?: boolean;
             } | null;
+            social_links?: SocialLink[];
             links: Array<{
                 id: string;
                 title: string;
                 url: string;
                 icon: string;
                 thumbnail_url?: string | null;
+                display_type?: 'standard' | 'featured';
+                description?: string | null;
             }>;
         }>(`/profile/${username}`),
 
+    getSocialLinks: () => api.get<{ social_links: SocialLink[] }>('/profile/social-links'),
+
+    updateSocialLinks: (socialLinks: SocialLink[]) =>
+        api.put<{ social_links: SocialLink[] }>('/profile/social-links', { social_links: socialLinks }),
+
     getProfileConfig: () => api.get<{
-        background_type: string;
+        background_type: 'color' | 'image';
         background_value: string | null;
         text_color: string | null;
         support_button_text?: string | null;
+        accent_color?: string | null;
+        card_style?: 'solid' | 'outline' | 'glass' | null;
+        profile_alignment?: 'left' | 'center' | 'right' | null;
+        avatar_shape?: 'circle' | 'rounded' | null;
+        avatar_size?: 'small' | 'medium' | 'large' | null;
+        support_button_style?: 'solid' | 'outline' | null;
+        support_enabled?: boolean;
     }>('/profile/config'),
 
     updateProfileConfig: (data: {
@@ -349,12 +380,31 @@ export const profileApi = {
         background_value?: string | null;
         text_color?: string | null;
         support_button_text?: string | null;
-    }) => api.patch('/profile/config', data),
+        accent_color?: string | null;
+        card_style?: 'solid' | 'outline' | 'glass' | null;
+        profile_alignment?: 'left' | 'center' | 'right' | null;
+        avatar_shape?: 'circle' | 'rounded' | null;
+        avatar_size?: 'small' | 'medium' | 'large' | null;
+        support_button_style?: 'solid' | 'outline' | null;
+        support_enabled?: boolean;
+    }) => api.patch<{
+        background_type: 'color' | 'image';
+        background_value: string | null;
+        text_color: string | null;
+        support_button_text?: string | null;
+        accent_color?: string | null;
+        card_style?: 'solid' | 'outline' | 'glass' | null;
+        profile_alignment?: 'left' | 'center' | 'right' | null;
+        avatar_shape?: 'circle' | 'rounded' | null;
+        avatar_size?: 'small' | 'medium' | 'large' | null;
+        support_button_style?: 'solid' | 'outline' | null;
+        support_enabled?: boolean;
+    }>('/profile/config', data),
 };
 
 // Media API
 export const mediaApi = {
-    upload: async (file: File) => {
+    upload: async (file: File, options?: { preserveQuality?: boolean }) => {
         const FILE_TOO_LARGE_MESSAGE = 'Image too large. Keep it below 10MB.';
         const normalizeUploadError = (message: string) => {
             const normalized = message.toLowerCase();
@@ -367,9 +417,28 @@ export const mediaApi = {
             return isTooLarge ? FILE_TOO_LARGE_MESSAGE : message;
         };
 
+        const prepareImage = async (source: File) => {
+            if (!source.type.startsWith('image/') || ['image/gif', 'image/svg+xml', 'image/heic', 'image/heif'].includes(source.type)) return source;
+            try {
+                const bitmap = await createImageBitmap(source);
+                const maxDimension = options?.preserveQuality ? 4096 : 2400;
+                const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close();
+                const optimized = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', options?.preserveQuality ? 0.95 : 0.86));
+                return optimized ? new File([optimized], `${source.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp' }) : source;
+            } catch {
+                return source;
+            }
+        };
+        const uploadFile = await prepareImage(file);
+
         const uploadViaApi = () => {
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', uploadFile);
             return api.post<{ url: string; fileId: string; fileType?: string; size?: number }>('/media/upload', formData);
         };
 
@@ -397,7 +466,7 @@ export const mediaApi = {
             const { timestamp, signature, apiKey, cloudName, folder, format } = signResponse.data;
 
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', uploadFile);
             formData.append('api_key', apiKey);
             formData.append('timestamp', String(timestamp));
             formData.append('signature', signature);
@@ -411,7 +480,13 @@ export const mediaApi = {
                 body: formData,
             });
 
-            let uploadData: any = null;
+            let uploadData: {
+                secure_url?: string;
+                public_id?: string;
+                resource_type?: string;
+                bytes?: number;
+                error?: { message?: string };
+            } | null = null;
             try {
                 uploadData = await uploadResponse.json();
             } catch {
@@ -422,12 +497,16 @@ export const mediaApi = {
                 throw new Error(normalizeUploadError(uploadData?.error?.message || 'Failed to upload file'));
             }
 
+            if (!uploadData?.secure_url || !uploadData.public_id || !uploadData.resource_type) {
+                throw new Error('Upload failed: Cloudinary returned incomplete file data');
+            }
+
             return {
                 success: true,
                 data: {
-                    url: uploadData.secure_url as string,
-                    fileId: uploadData.public_id as string,
-                    fileType: uploadData.resource_type as string,
+                    url: uploadData.secure_url,
+                    fileId: uploadData.public_id,
+                    fileType: uploadData.resource_type,
                     size: uploadData.bytes as number,
                 },
             } as ApiResponse<{ url: string; fileId: string; fileType?: string; size?: number }>;
@@ -455,6 +534,7 @@ export const giftApi = {
     sendGift: (data: {
         creatorUsername: string;
         amount: number;
+        currency?: 'NGN' | 'USD';
         sender_email: string;
         sender_name?: string;
         description?: string;
@@ -465,6 +545,7 @@ export const giftApi = {
             transaction_id: number;
         }>(`/gift/${data.creatorUsername}`, {
             amount: data.amount,
+            currency: data.currency || 'NGN',
             sender_email: data.sender_email,
             sender_name: data.sender_name,
             description: data.description,
@@ -478,11 +559,14 @@ export const giftApi = {
 
 // Store API
 export const storeApi = {
+  getStoreCurrency: () => api.get<{ currency: 'NGN' | 'USD' }>('/store/settings/currency'),
+  setStoreCurrency: (currency: 'NGN' | 'USD') => api.patch<{ currency: 'NGN' | 'USD' }>('/store/settings/currency', { currency }),
     createProduct: (data: {
         type: 'digital' | 'physical' | 'service';
         title: string;
         description?: string | null;
         price: number;
+        compare_at_price?: number | null;
         currency?: string;
         cover_url?: string | null;
         is_active?: boolean;
@@ -503,6 +587,7 @@ export const storeApi = {
         title: string;
         description?: string | null;
         price: number;
+        compare_at_price?: number | null;
         currency?: string;
         cover_url?: string | null;
         is_active?: boolean;
@@ -536,7 +621,7 @@ export const storeApi = {
         const query = queryParams.toString();
         return api.get(`/store/orders${query ? `?${query}` : ''}`);
     },
-    updateOrderStatus: (orderId: number, status: 'cancelled' | 'refunded') =>
+    updateOrderStatus: (orderId: number, status: 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded') =>
         api.patch(`/store/orders/${orderId}/status`, { status }),
     resendOrderEmail: (orderId: number) => api.post(`/store/orders/${orderId}/resend-email`),
 
@@ -555,14 +640,32 @@ export const storeApi = {
         if (params?.limit) queryParams.append('limit', params.limit.toString());
         if (params?.offset) queryParams.append('offset', params.offset.toString());
         const query = queryParams.toString();
-        return api.get(`/store/${username}${query ? `?${query}` : ''}`);
+        return api.get<{
+            creator: {
+                id: number;
+                username: string;
+                first_name: string;
+                last_name: string;
+                display_name?: string | null;
+                bio?: string;
+                avatar_url?: string;
+                profile_config?: {
+                    background_type?: string;
+                    background_value?: string | null;
+                    text_color?: string | null;
+                    accent_color?: string | null;
+                    card_style?: 'solid' | 'outline' | 'glass' | null;
+                } | null;
+            };
+            products: StoreProduct[];
+        }>(`/store/${username}${query ? `?${query}` : ''}`);
     },
 
     initiatePurchase: (username: string, productId: number, data: {
         buyer_email: string;
         buyer_name: string;
         buyer_phone: string;
-        delivery_address?: Record<string, any> | null;
+        delivery_address?: Record<string, unknown> | null;
         hold_booking_id?: number;
         hold_token?: string;
         slot_start?: string;
@@ -573,7 +676,7 @@ export const storeApi = {
         buyer_email: string;
         buyer_name: string;
         buyer_phone: string;
-        delivery_address?: Record<string, any> | null;
+        delivery_address?: Record<string, unknown> | null;
         items: Array<{ product_id: number; quantity: number }>;
     }) => api.post(`/store/${username}/cart/checkout`, data),
 

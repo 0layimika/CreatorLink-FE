@@ -1,49 +1,32 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { LoaderCircle } from 'lucide-react';
+import { AuthShell, AuthState } from '@/components/auth/AuthShell';
 
-function VerifyPageContent() {
+function VerifyRedirect() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
     const token = searchParams.get('token');
-    
-    if (token) {
-      // Redirect to verify-email page with the token
-      router.replace(`/verify-email?token=${token}`);
-    } else {
-      // No token, redirect to verify-email page
-      router.replace('/verify-email');
-    }
-  }, [searchParams, router]);
+    router.replace(token ? `/verify-email?token=${encodeURIComponent(token)}` : '/verify-email');
+  }, [router, searchParams]);
 
+  return <RedirectState />;
+}
+
+function RedirectState() {
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-      <Card className="p-8 max-w-md w-full text-center shadow-medium">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-foreground mb-2">Redirecting...</h2>
-        <p className="text-text-secondary">Please wait while we redirect you to the verification page.</p>
-      </Card>
-    </div>
+    <AuthShell eyebrow="Email verification" title="Taking you to the right place…" description="This will only take a second.">
+      <AuthState title="Opening verification" description="Your link is being prepared.">
+        <LoaderCircle className="mx-auto h-6 w-6 animate-spin text-primary" />
+      </AuthState>
+    </AuthShell>
   );
 }
 
 export default function VerifyPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-        <Card className="p-8 max-w-md w-full text-center shadow-medium">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">Loading...</h2>
-        </Card>
-      </div>
-    }>
-      <VerifyPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<RedirectState />}><VerifyRedirect /></Suspense>;
 }
-

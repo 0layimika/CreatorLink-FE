@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { cn } from '@/lib/utils';
+import { Input, Select } from '@/components/ui/Input';
 
 interface Bank {
   code: string;
@@ -116,24 +115,15 @@ export function BankAccountForm({
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Bank
-            </label>
-            <select
-              value={bankCode}
-              onChange={(e) => setBankCode(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg bg-card border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-              required
-            >
-              <option value="">Select a bank</option>
-              {banks.map((bank) => (
-                <option key={bank.code} value={bank.code}>
-                  {bank.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Bank"
+            value={bankCode}
+            onChange={(e) => setBankCode(e.target.value)}
+            options={banks.map((bank) => ({ label: bank.name, value: bank.code }))}
+            placeholder="Select a bank"
+            required
+            disabled={isResolving || isSaving}
+          />
 
           <Input
             label="Account Number"
@@ -210,4 +200,3 @@ export function BankAccountForm({
     </div>
   );
 }
-

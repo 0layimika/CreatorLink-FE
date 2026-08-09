@@ -23,17 +23,24 @@ export function useProfileConfig(): UseProfileConfigReturn {
     try {
       const response = await profileApi.getProfileConfig();
       if (response.success && response.data) {
-        const data = response.data as any;
+        const data = response.data;
         setConfig({
           background_type: data.background_type || 'color',
           background_value: data.background_value ?? null,
           text_color: data.text_color ?? null,
           support_button_text: data.support_button_text ?? 'Support me',
+          accent_color: data.accent_color ?? null,
+          card_style: data.card_style ?? null,
+          profile_alignment: data.profile_alignment ?? null,
+          avatar_shape: data.avatar_shape ?? null,
+          avatar_size: data.avatar_size ?? null,
+          support_button_style: data.support_button_style ?? null,
+          support_enabled: data.support_enabled ?? true,
         });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch profile config');
-      setConfig({
+        setConfig({
         background_type: 'color',
         background_value: null,
         text_color: null,
@@ -51,12 +58,19 @@ export function useProfileConfig(): UseProfileConfigReturn {
   const updateConfig = useCallback(async (data: Partial<ProfileConfig>) => {
     const response = await profileApi.updateProfileConfig(data);
     if (response.success && response.data) {
-      const updated = response.data as any;
+      const updated = response.data;
       setConfig({
         background_type: updated.background_type || 'color',
         background_value: updated.background_value ?? null,
         text_color: updated.text_color ?? null,
-        support_button_text: updated.support_button_text ?? 'Support me',
+          support_button_text: updated.support_button_text ?? 'Support me',
+          accent_color: updated.accent_color ?? null,
+          card_style: updated.card_style ?? null,
+          profile_alignment: updated.profile_alignment ?? null,
+          avatar_shape: updated.avatar_shape ?? null,
+          avatar_size: updated.avatar_size ?? null,
+          support_button_style: updated.support_button_style ?? null,
+          support_enabled: updated.support_enabled ?? true,
       });
     } else {
       throw new Error('Failed to update profile config');

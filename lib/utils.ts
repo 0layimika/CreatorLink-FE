@@ -9,8 +9,8 @@ export function formatCurrency(amount: number, currency: string = 'NGN'): string
   const formatter = new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: currency === 'USD' ? 2 : 0,
+    maximumFractionDigits: currency === 'USD' ? 2 : 0,
   });
 
   if (currency === 'NGN') {

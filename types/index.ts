@@ -9,12 +9,21 @@ export interface User {
   createdAt: string;
 }
 
+export interface CreatorIdentity {
+  username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string | null;
+}
+
 export interface Link {
   id: string;
   title: string;
   url: string;
   icon: string;
   thumbnail_url?: string | null;
+  display_type?: 'standard' | 'featured';
+  description?: string | null;
   clicks: number;
   enabled: boolean;
   order: number;
@@ -25,6 +34,42 @@ export interface ProfileConfig {
   background_value: string | null;
   text_color: string | null;
   support_button_text?: string | null;
+  accent_color?: string | null;
+  card_style?: 'solid' | 'outline' | 'glass' | null;
+  profile_alignment?: 'left' | 'center' | 'right' | null;
+  avatar_shape?: 'circle' | 'rounded' | null;
+  avatar_size?: 'small' | 'medium' | 'large' | null;
+  support_button_style?: 'solid' | 'outline' | null;
+  support_enabled?: boolean;
+}
+
+export const SOCIAL_PLATFORMS = [
+  'x',
+  'instagram',
+  'tiktok',
+  'youtube',
+  'pinterest',
+  'facebook',
+  'linkedin',
+  'snapchat',
+  'twitch',
+  'spotify',
+  'threads',
+  'discord',
+  'whatsapp',
+  'telegram',
+  'email',
+] as const;
+
+// Website remains in the type for backward compatibility with existing saved rows,
+// but is intentionally no longer offered as a new editor option.
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number] | 'website';
+
+export interface SocialLink {
+  platform: SocialPlatform;
+  url: string;
+  position: number;
+  is_visible?: boolean;
 }
 
 export interface Stats {
@@ -120,6 +165,7 @@ export interface StoreProduct {
   title: string;
   description?: string | null;
   price: number;
+  compare_at_price?: number | null;
   currency: string;
   cover_url?: string | null;
   is_active: boolean;
@@ -138,7 +184,7 @@ export interface StoreProduct {
   updated_at?: string;
 }
 
-export type StoreOrderStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
+export type StoreOrderStatus = 'pending' | 'paid' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'failed' | 'refunded' | 'cancelled' | 'expired';
 
 export interface StoreOrder {
   id: number;
@@ -148,7 +194,7 @@ export interface StoreOrder {
   buyer_email: string;
   buyer_name?: string | null;
   buyer_phone?: string | null;
-  delivery_address?: Record<string, any> | null;
+  delivery_address?: Record<string, unknown> | null;
   status: StoreOrderStatus;
   amount: number;
   subtotal?: number;
@@ -160,7 +206,7 @@ export interface StoreOrder {
   reference: string;
   provider: string;
   provider_reference?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   items?: StoreOrderItem[];
   created_at?: string;
   updated_at?: string;

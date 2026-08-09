@@ -1,130 +1,95 @@
-'use client';
-
-import { ArrowRight, ExternalLink, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import { ArrowRight, Check, Heart, Mic2, Paintbrush, Video } from 'lucide-react';
 
-const creators = [
+const steps = [
   {
-    name: 'Sarah Chen',
-    role: 'Tech Educator',
-    avatar: 'SC',
-    color: 'from-blue-500 to-cyan-500',
-    stats: { followers: '125K', engagement: '8.5%' },
-    links: 4,
+    number: '01',
+    title: 'Claim your name',
+    copy: 'Pick a link people can remember—even after scrolling past 200 videos.',
   },
   {
-    name: 'Marcus Taylor',
-    role: 'Fitness Coach',
-    avatar: 'MT',
-    color: 'from-orange-500 to-red-500',
-    stats: { followers: '98K', engagement: '12.3%' },
-    links: 6,
+    number: '02',
+    title: 'Make it yours',
+    copy: 'Add your links, products, services and personality. Especially the personality.',
   },
   {
-    name: 'Elena Rodriguez',
-    role: 'Food Creator',
-    avatar: 'ER',
-    color: 'from-pink-500 to-purple-500',
-    stats: { followers: '210K', engagement: '15.7%' },
-    links: 5,
+    number: '03',
+    title: 'Share it everywhere',
+    copy: 'Drop it in your bios, QR codes and group chats. Watch the clicks and support roll in.',
   },
+];
+
+const creatorTypes = [
+  { icon: Video, label: 'Content creators', tone: 'bg-secondary' },
+  { icon: Paintbrush, label: 'Artists & designers', tone: 'bg-surface-pink' },
+  { icon: Mic2, label: 'Coaches & experts', tone: 'bg-surface-blue' },
+  { icon: Heart, label: 'Anyone with a thing', tone: 'bg-white' },
 ];
 
 export function CreatorExamples() {
   return (
-    <section id="creators" className="relative py-32 px-4 sm:px-6 lg:px-8 bg-muted/35">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-20 max-w-3xl mx-auto animate-fade-up">
-          <div className="inline-flex items-center space-x-2 bg-background border border-border/60 rounded-full px-4 py-2 mb-6">
-            <TrendingUp className="h-3 w-3 text-primary" />
-            <span className="text-sm text-foreground font-medium">
-              Join successful creators
-            </span>
+    <>
+      <section id="how-it-works" className="scroll-mt-24 border-b border-border bg-card py-20 sm:py-28">
+        <div className="page-shell">
+          <div className="max-w-4xl">
+            <p className="eyebrow">Easy does it</p>
+            <h2 className="display-section mt-5">From “I need a website” to “link in bio” in three steps.</h2>
           </div>
 
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
-            You&apos;re in
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-foreground to-secondary">
-              {' '}good company
-            </span>
-          </h2>
-
-          <p className="text-lg text-text-secondary leading-relaxed">
-            Thousands of creators trust LinkVerse to power their online presence
-            and grow their audience every day.
-          </p>
+          <div className="mt-14 grid border-y border-border md:grid-cols-3">
+            {steps.map((step, index) => (
+              <article key={step.number} className={`py-8 md:px-8 md:py-10 ${index > 0 ? 'border-t border-border md:border-l md:border-t-0' : ''}`}>
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-foreground font-black text-background">
+                  {step.number}
+                </span>
+                <h3 className="mt-12 font-display text-3xl font-black tracking-[-0.04em] text-foreground">{step.title}</h3>
+                <p className="mt-4 text-base leading-7 text-text-secondary">{step.copy}</p>
+                <div className="mt-8 flex items-center gap-2 text-sm font-bold text-primary">
+                  <Check className="h-4 w-4" /> Done before your tea gets cold
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-          {creators.map((creator, index) => (
-            <div
-              key={creator.name}
-              className="group relative"
-              style={{
-                animationDelay: `${index * 100}ms`,
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-              <div className="relative surface-panel hover:border-border rounded-3xl p-8 transition-all duration-300 hover:shadow-medium group-hover:-translate-y-2">
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="relative">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${creator.color} flex items-center justify-center shadow-lg`}>
-                      <span className="text-2xl font-bold text-white">
-                        {creator.avatar}
-                      </span>
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-card" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-foreground">
-                      {creator.name}
-                    </h3>
-                    <p className="text-sm text-text-secondary">{creator.role}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="font-display text-2xl font-bold text-foreground mb-1">
-                      {creator.stats.followers}
-                    </div>
-                    <div className="text-xs text-text-secondary font-medium">
-                      Followers
-                    </div>
-                  </div>
-                  <div className="bg-muted/50 rounded-xl p-4">
-                    <div className="font-display text-2xl font-bold text-primary mb-1">
-                      {creator.stats.engagement}
-                    </div>
-                    <div className="text-xs text-text-secondary font-medium">
-                      Engagement
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-border/40">
-                  <span className="text-sm text-text-secondary font-medium">
-                    {creator.links} active links
-                  </span>
-                  <ExternalLink className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
-                </div>
-              </div>
+      <section id="made-for" className="scroll-mt-24 border-b border-border py-20 sm:py-28">
+        <div className="page-shell">
+          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div>
+              <p className="eyebrow">Made for your kind of busy</p>
+              <h2 className="display-section mt-5">You make the thing. Your link should help sell it.</h2>
+              <p className="mt-6 max-w-xl text-lg leading-8 text-text-secondary">
+                Whether you post every day or disappear for a month to make something brilliant, LinkVerse keeps your best work open for business.
+              </p>
             </div>
-          ))}
-        </div>
 
-        {/* CTA */}
-        <div className="text-center">
-          <Link href="/signup">
-            <Button size="lg" className="text-base h-12 px-8">
-              Start your journey
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {creatorTypes.map(({ icon: Icon, label, tone }, index) => (
+                <div key={label} className={`flex min-h-44 flex-col justify-between rounded-[28px] border border-ink p-5 text-ink ${tone} ${index % 2 ? 'sm:translate-y-6' : ''}`}>
+                  <Icon className="h-6 w-6" />
+                  <p className="font-display text-2xl font-black tracking-[-0.04em]">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-24 overflow-hidden rounded-[36px] border border-ink bg-primary px-6 py-12 text-white sm:px-10 sm:py-16 lg:px-16">
+            <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-secondary">Your link is doing too little</p>
+                <h2 className="mt-5 max-w-4xl font-display text-5xl font-black leading-[0.93] tracking-[-0.06em] sm:text-6xl lg:text-8xl">
+                  Let’s give it a proper job.
+                </h2>
+              </div>
+              <Link href="/signup" className="brand-button brand-button-lg shrink-0 bg-secondary text-ink hover:bg-white">
+                Build yours free
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

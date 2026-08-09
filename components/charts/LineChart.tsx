@@ -10,7 +10,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { theme } from '@/lib/constants';
 
 interface LineChartProps {
   data: Array<{
@@ -24,16 +23,16 @@ export default function LineChart({ data }: LineChartProps) {
   return (
     <ResponsiveContainer width="100%" height={350}>
       <RechartsLineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.border} />
+        <CartesianGrid strokeDasharray="4 6" stroke="#d6d4cd" vertical={false} />
         <XAxis
           dataKey="date"
-          stroke={theme.colors.textSecondary}
+          stroke="#777772"
           fontSize={12}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          stroke={theme.colors.textSecondary}
+          stroke="#777772"
           fontSize={12}
           tickLine={false}
           axisLine={false}
@@ -41,32 +40,32 @@ export default function LineChart({ data }: LineChartProps) {
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: theme.colors.card,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: '8px',
-            color: theme.colors.textPrimary,
+            backgroundColor: '#111111',
+            border: '1px solid #111111',
+            borderRadius: '14px',
+            color: '#ffffff',
           }}
-          itemStyle={{ color: theme.colors.textPrimary }}
-          labelStyle={{ color: theme.colors.textSecondary }}
+          itemStyle={{ color: '#ffffff' }}
+          labelStyle={{ color: '#baff3c' }}
         />
         <Legend
-          wrapperStyle={{ color: theme.colors.textSecondary }}
+          wrapperStyle={{ color: '#777772', fontSize: 12 }}
         />
         <Line
           type="monotone"
           dataKey="views"
-          stroke={theme.colors.primary}
-          strokeWidth={2}
+          stroke="#2457f5"
+          strokeWidth={3}
           dot={false}
-          activeDot={{ r: 6, fill: theme.colors.primary }}
+          activeDot={{ r: 6, fill: '#2457f5' }}
         />
         <Line
           type="monotone"
           dataKey="clicks"
-          stroke={theme.colors.secondary}
-          strokeWidth={2}
+          stroke="#8acb17"
+          strokeWidth={3}
           dot={false}
-          activeDot={{ r: 6, fill: theme.colors.secondary }}
+          activeDot={{ r: 6, fill: '#8acb17' }}
         />
       </RechartsLineChart>
     </ResponsiveContainer>

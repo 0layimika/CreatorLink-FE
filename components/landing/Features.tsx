@@ -1,136 +1,102 @@
-import { BarChart3, Gift, Palette, QrCode, ShoppingBag, Link as LinkIcon, type LucideIcon } from 'lucide-react';
-import { GlowingEffect } from '@/components/ui/glowing-effect';
-import { cn } from '@/lib/utils';
+import { BarChart3, CalendarCheck, Gift, Link2, Palette, ShoppingBag, type LucideIcon } from 'lucide-react';
 
-const featureItems = [
+const features = [
   {
-    area: 'md:[grid-area:1/1/2/7] xl:[grid-area:1/1/2/6]',
+    icon: Link2,
+    number: '01',
+    title: 'All your things, finally together.',
+    copy: 'Content, socials, projects, communities—give every good thing you make a proper place to live.',
+    className: 'bg-primary text-white md:col-span-7',
+    iconClassName: 'bg-white text-primary',
+  },
+  {
     icon: Gift,
-    title: 'Receive Gifts From Your Audience',
-    lines: [
-      'Let your supporters send you money directly from your page.',
-      'No complicated setup. No awkward DMs. Just support.',
-      'Turn fans into supporters in seconds.',
-    ],
-    accent: 'bg-sky-50 border-sky-200',
+    number: '02',
+    title: 'Let the love pay.',
+    copy: 'Your people can send a gift right from your page. No awkward DMs. No complicated setup.',
+    className: 'bg-secondary text-ink md:col-span-5',
+    iconClassName: 'bg-ink text-white',
   },
   {
-    area: 'md:[grid-area:1/7/2/13] xl:[grid-area:1/6/2/13]',
-    icon: LinkIcon,
-    title: 'Beautiful Link Pages',
-    lines: [
-      'Showcase everything you do in one stunning page.',
-      'Social links • Products • Content • Projects • Communities',
-      'Your entire digital presence. One link.',
-    ],
-    accent: 'bg-indigo-50 border-indigo-200',
-  },
-  {
-    area: 'md:[grid-area:2/1/3/7] xl:[grid-area:2/1/3/5]',
-    icon: BarChart3,
-    title: 'Smart Creator Analytics',
-    lines: [
-      'Know what your audience actually clicks.',
-      'Track: Page views, Link clicks, Engagement, Top performing links.',
-      'Make smarter content decisions with real data.',
-    ],
-    accent: 'bg-teal-50 border-teal-200',
-  },
-  {
-    area: 'md:[grid-area:2/7/3/13] xl:[grid-area:2/5/3/9]',
-    icon: Palette,
-    title: 'Fully Customizable',
-    lines: [
-      'Make your page feel like YOU.',
-      'Themes & colors, Layout control, Custom thumbnails, Creator branding.',
-      'Your link page shouldn’t look like everyone else’s.',
-    ],
-    accent: 'bg-amber-50 border-amber-200',
-  },
-  {
-    area: 'md:[grid-area:3/1/4/7] xl:[grid-area:2/9/3/13]',
-    icon: QrCode,
-    title: 'QR Codes For Everywhere',
-    lines: [
-      'Turn offline moments into followers and support.',
-      'Add your QR code to events, posters, merch, and business cards.',
-      'Scan → discover → support.',
-    ],
-    accent: 'bg-cyan-50 border-cyan-200',
-  },
-  {
-    area: 'md:[grid-area:3/7/4/13] xl:[grid-area:3/1/4/13]',
     icon: ShoppingBag,
-    title: 'Storefront + Services',
-    lines: [
-      'Sell your digital and physical products. Sell services as well, and handle your appointments.',
-    ],
-    accent: 'bg-blue-50 border-blue-200',
+    number: '03',
+    title: 'Sell without sending people on a treasure hunt.',
+    copy: 'Digital drops, physical products and paid services—all a tap away from your bio.',
+    className: 'bg-surface-pink text-ink md:col-span-5',
+    iconClassName: 'bg-white text-ink',
+  },
+  {
+    icon: BarChart3,
+    number: '04',
+    title: 'Know what is actually working.',
+    copy: 'See the links people love, where the clicks come from and what deserves more of your energy.',
+    className: 'bg-ink text-white md:col-span-7',
+    iconClassName: 'bg-secondary text-ink',
+  },
+  {
+    icon: Palette,
+    number: '05',
+    title: 'Make it look like you.',
+    copy: 'Choose the colours, layout, images and little details. Your page should not look borrowed.',
+    className: 'bg-surface-blue text-ink md:col-span-6',
+    iconClassName: 'bg-primary text-white',
+  },
+  {
+    icon: CalendarCheck,
+    number: '06',
+    title: 'Bookings without the back-and-forth.',
+    copy: 'Show your availability, take service bookings and keep your next client moving.',
+    className: 'bg-card text-foreground md:col-span-6',
+    iconClassName: 'bg-surface-pink text-ink',
   },
 ];
 
 export function Features() {
   return (
-    <section id="features" className="py-16 px-4 sm:px-6 lg:px-8 bg-background">
-      <div className="max-w-7xl mx-auto">
-        <div className="max-w-3xl mb-10">
-          <p className="text-xs uppercase tracking-[0.16em] text-text-secondary mb-3">
-            Product features
+    <section id="features" className="scroll-mt-24 border-b border-border py-20 sm:py-28">
+      <div className="page-shell">
+        <div className="grid gap-7 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div>
+            <p className="eyebrow">The good stuff</p>
+            <h2 className="display-section mt-5">A small link doing a lot of work.</h2>
+          </div>
+          <p className="max-w-xl text-lg leading-8 text-text-secondary lg:ml-auto lg:text-xl">
+            LinkVerse is your profile, storefront, booking desk and tiny fan club HQ—all without turning setup into a weekend project.
           </p>
-          <h2 className="font-display text-3xl sm:text-4xl text-foreground leading-tight">
-            Built for creators who want to earn from attention
-          </h2>
         </div>
 
-        <ul className="grid grid-cols-1 grid-rows-none gap-4 md:grid-cols-12 md:grid-rows-3 xl:grid-rows-3">
-          {featureItems.map((item) => (
-            <FeatureTile key={item.title} {...item} />
+        <div className="mt-12 grid gap-4 md:grid-cols-12">
+          {features.map((feature) => (
+            <FeatureCard key={feature.number} {...feature} />
           ))}
-        </ul>
+        </div>
       </div>
     </section>
   );
 }
 
-interface FeatureTileProps {
-  area: string;
+interface FeatureCardProps {
   icon: LucideIcon;
+  number: string;
   title: string;
-  lines: string[];
-  accent: string;
+  copy: string;
+  className: string;
+  iconClassName: string;
 }
 
-function FeatureTile({ area, icon: Icon, title, lines, accent }: FeatureTileProps) {
+function FeatureCard({ icon: Icon, number, title, copy, className, iconClassName }: FeatureCardProps) {
   return (
-    <li className={cn('list-none min-h-[13rem]', area)}>
-      <article className="relative h-full rounded-[1.35rem] border border-border/80 p-2">
-        <GlowingEffect
-          spread={38}
-          glow={true}
-          disabled={false}
-          proximity={70}
-          inactiveZone={0.05}
-          borderWidth={2}
-        />
-        <div className="relative h-full rounded-2xl border border-border bg-card p-5 md:p-6 overflow-hidden">
-          <div
-            className={cn(
-              'absolute right-4 top-4 h-16 w-16 rounded-2xl border opacity-80 flex items-center justify-center',
-              accent
-            )}
-          >
-            <Icon className="h-6 w-6 text-foreground" />
-          </div>
-          <div className="relative flex h-full flex-col">
-            <h3 className="font-display text-xl text-foreground mb-3 leading-snug">{title}</h3>
-            <div className="space-y-2 text-sm text-text-secondary leading-relaxed">
-              {lines.map((line, idx) => (
-                <p key={`${title}-${idx}`}>{line}</p>
-              ))}
-            </div>
-          </div>
+    <article className={`group flex min-h-[340px] flex-col justify-between rounded-[32px] border border-ink/90 p-6 transition-transform duration-300 hover:-translate-y-1 sm:p-8 ${className}`}>
+      <div className="flex items-start justify-between">
+        <div className={`grid h-12 w-12 place-items-center rounded-full ${iconClassName}`}>
+          <Icon className="h-5 w-5" />
         </div>
-      </article>
-    </li>
+        <span className="text-sm font-black opacity-55">/{number}</span>
+      </div>
+      <div>
+        <h3 className="max-w-xl font-display text-3xl font-black leading-[1.02] tracking-[-0.045em] sm:text-4xl">{title}</h3>
+        <p className="mt-5 max-w-xl text-base leading-7 opacity-75 sm:text-lg">{copy}</p>
+      </div>
+    </article>
   );
 }

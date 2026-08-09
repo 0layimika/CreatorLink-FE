@@ -1,131 +1,78 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { ArrowRight, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
-import { BrandWordmark } from '@/components/ui/BrandWordmark';
+import { AuthShell, AuthState, FormAlert } from '@/components/auth/AuthShell';
 import { authApi } from '@/lib/api';
-import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendResetEmail = async (isResend = false) => {
     setError(null);
+    setResendSuccess(false);
     setIsLoading(true);
-
     try {
-      await authApi.forgotPassword(email);
+      const normalizedEmail = email.trim().toLowerCase();
+      if (isResend) await authApi.resendForgotPassword(normalizedEmail);
+      else await authApi.forgotPassword(normalizedEmail);
       setIsSuccess(true);
+      setResendSuccess(isResend);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset link. Please try again.');
+      setError(err instanceof Error ? err.message : 'We could not send the reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleResend = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      await authApi.resendForgotPassword(email);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resend. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <Card className="p-8 text-center shadow-medium">
-            <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-foreground mb-2">Check your email</h2>
-            <p className="text-text-secondary mb-6">
-              We&apos;ve sent a password reset link to <span className="font-medium text-foreground">{email}</span>
-            </p>
-            <p className="text-sm text-text-secondary mb-6">
-              Didn&apos;t receive the email? Check your spam folder or{' '}
-              <button
-                onClick={handleResend}
-                disabled={isLoading}
-                className="text-primary hover:underline font-medium"
-              >
-                click here to resend
-              </button>
-            </p>
-            {error && (
-              <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm mb-4">
-                {error}
-              </div>
-            )}
-            <Link href="/login">
-              <Button variant="outline" className="w-full">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to login
-              </Button>
-            </Link>
-          </Card>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <BrandWordmark textClassName="font-display text-2xl font-bold text-foreground" imageClassName="h-9 w-9 rounded-lg" /></Link>
-          <h1 className="mt-6 text-2xl font-bold text-foreground">
-            Forgot your password?
-          </h1>
-          <p className="mt-2 text-text-secondary">
-            No worries, we&apos;ll send you reset instructions.
-          </p>
-        </div>
-
-        <Card className="p-6 shadow-medium">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
-                {error}
-              </div>
-            )}
-
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <Button type="submit" className="w-full" isLoading={isLoading}>
-              <Mail className="h-4 w-4 mr-2" />
-              Send reset link
+    <AuthShell
+      eyebrow="Password rescue"
+      title={isSuccess ? 'Go check your inbox.' : 'Forgot your password? It happens.'}
+      description={isSuccess ? <>We sent reset instructions to <strong className="text-foreground">{email}</strong>.</> : 'Tell us where to send the reset link and we’ll get you back in.'}
+      backHref="/login"
+      backLabel="Back to sign in"
+      sideTitle="A tiny detour. You’ll be back in no time."
+    >
+      {isSuccess ? (
+        <AuthState icon="success" title="Email on the way" description="Open the link in the email to choose a new password. It expires shortly, so don’t leave it hanging.">
+          <div className="space-y-3">
+            {resendSuccess && <FormAlert tone="success">A fresh link is on its way.</FormAlert>}
+            {error && <FormAlert tone="error">{error}</FormAlert>}
+            <Button type="button" variant="outline" size="lg" className="w-full" isLoading={isLoading} onClick={() => sendResetEmail(true)}>
+              Resend the email
             </Button>
-          </form>
-        </Card>
-
-        <p className="mt-6 text-center text-sm text-text-secondary">
-          <Link href="/login" className="text-primary hover:underline font-medium inline-flex items-center">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to login
-          </Link>
-        </p>
-      </div>
-    </div>
+            <button type="button" onClick={() => { setIsSuccess(false); setError(null); }} className="text-sm font-extrabold text-primary hover:underline">
+              Use a different email
+            </button>
+          </div>
+        </AuthState>
+      ) : (
+        <form onSubmit={(event) => { event.preventDefault(); void sendResetEmail(); }} className="space-y-5" noValidate>
+          {error && <FormAlert tone="error" title="Couldn’t send that">{error}</FormAlert>}
+          <Input
+            label="Email address"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            leadingIcon={<Mail className="h-5 w-5" />}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+          <Button type="submit" size="lg" className="w-full" isLoading={isLoading}>
+            Send my reset link
+            {!isLoading && <ArrowRight className="h-5 w-5" />}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

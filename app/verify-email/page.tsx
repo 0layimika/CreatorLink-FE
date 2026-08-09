@@ -1,70 +1,68 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowRight, LoaderCircle, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
-import { Loader2, CheckCircle2, XCircle, Mail } from 'lucide-react';
-import Link from 'next/link';
+import { AuthShell, AuthState, FormAlert } from '@/components/auth/AuthShell';
+
+type VerificationStatus = 'pending' | 'verifying' | 'success' | 'error';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { verify } = useAuth();
-  const [status, setStatus] = useState<'pending' | 'verifying' | 'success' | 'error'>('pending');
+  const attemptedToken = useRef<string | null>(null);
+  const [status, setStatus] = useState<VerificationStatus>('pending');
   const [error, setError] = useState<string | null>(null);
   const [resendEmail, setResendEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
 
-  useEffect(() => {
-    const token = searchParams.get('token');
-    const storedEmail = typeof window !== 'undefined' ? sessionStorage.getItem('verificationEmail') : null;
-
-    if (token) {
-      handleVerify(token);
-    } else if (storedEmail) {
-      setResendEmail(storedEmail);
-      setStatus('pending');
-    } else {
-      setStatus('pending');
-    }
-  }, [searchParams]);
-
-  const handleVerify = async (token: string) => {
+  const handleVerify = useCallback(async (token: string) => {
     setStatus('verifying');
     setError(null);
     try {
       await verify(token);
+      sessionStorage.removeItem('verificationEmail');
       setStatus('success');
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('verificationEmail');
-      }
-      // Redirect to creator setup after a short delay
-      setTimeout(() => {
-        router.push('/setup-creator');
-      }, 2000);
     } catch (err) {
       setStatus('error');
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      setError(err instanceof Error ? err.message : 'We could not verify this link.');
     }
-  };
+  }, [verify]);
 
-  const handleResendVerification = async () => {
-    if (!resendEmail) return;
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const storedEmail = sessionStorage.getItem('verificationEmail');
+    if (storedEmail) setResendEmail(storedEmail);
+    if (token && attemptedToken.current !== token) {
+      attemptedToken.current = token;
+      void handleVerify(token);
+    }
+  }, [handleVerify, searchParams]);
 
+  useEffect(() => {
+    if (status !== 'success') return;
+    const redirect = window.setTimeout(() => router.replace('/setup-creator'), 1400);
+    return () => window.clearTimeout(redirect);
+  }, [router, status]);
+
+  const handleResend = async () => {
+    if (!resendEmail.trim()) return;
     setIsResending(true);
     setError(null);
     setResendSuccess(false);
-
     try {
-      await authApi.resendVerification(resendEmail);
+      await authApi.resendVerification(resendEmail.trim().toLowerCase());
+      sessionStorage.setItem('verificationEmail', resendEmail.trim().toLowerCase());
       setResendSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resend verification email');
+      setError(err instanceof Error ? err.message : 'We could not resend the verification email.');
     } finally {
       setIsResending(false);
     }
@@ -72,127 +70,74 @@ function VerifyEmailContent() {
 
   if (status === 'verifying') {
     return (
-      <Card className="p-8 max-w-md w-full text-center shadow-medium">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-foreground mb-2">Verifying your email...</h2>
-        <p className="text-text-secondary">Please wait while we verify your account.</p>
-      </Card>
+      <AuthShell eyebrow="Step 2 of 3" title="Checking your link…" description="Hold tight while we verify your email." sideTitle="Just one click between you and your new page.">
+        <AuthState title="Verifying your email" description="This should only take a moment.">
+          <LoaderCircle className="mx-auto h-6 w-6 animate-spin text-primary" />
+        </AuthState>
+      </AuthShell>
     );
   }
 
   if (status === 'success') {
     return (
-      <Card className="p-8 max-w-md w-full text-center shadow-medium">
-        <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-foreground mb-2">Email Verified!</h2>
-        <p className="text-text-secondary mb-4">Your account has been verified successfully.</p>
-        <p className="text-sm text-text-secondary">Redirecting to creator setup...</p>
-      </Card>
+      <AuthShell eyebrow="Step 2 of 3" title="You’re officially you." description="Email verified. Now let’s put your name on your page." sideTitle="That’s the serious bit done. Time for the fun part.">
+        <AuthState icon="success" title="Email verified" description="Taking you to your profile setup now…">
+          <Button type="button" size="lg" className="w-full" onClick={() => router.replace('/setup-creator')}>
+            Set up my page <ArrowRight className="h-5 w-5" />
+          </Button>
+        </AuthState>
+      </AuthShell>
     );
   }
 
-  if (status === 'error') {
-    return (
-      <Card className="p-8 max-w-md w-full text-center shadow-medium">
-        <XCircle className="h-12 w-12 text-error mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-foreground mb-2">Verification Failed</h2>
-        <p className="text-text-secondary mb-4">{error || 'The verification link is invalid or has expired.'}</p>
-
-        <div className="mb-6 space-y-3">
-          <p className="text-sm text-text-secondary">Enter your email to resend verification:</p>
-          <Input
-            type="email"
-            placeholder="you@example.com"
-            value={resendEmail}
-            onChange={(e) => setResendEmail(e.target.value)}
-          />
-          {resendSuccess && (
-            <p className="text-sm text-success">Verification email sent!</p>
-          )}
-          <Button
-            onClick={handleResendVerification}
-            variant="outline"
-            className="w-full"
-            isLoading={isResending}
-          >
-            Resend verification email
-          </Button>
-        </div>
-
-        <div className="flex flex-col space-y-2">
-          <Button onClick={() => router.push('/signup')}>
-            Sign up again
-          </Button>
-          <Button variant="ghost" onClick={() => router.push('/login')}>
-            Go to login
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  // Pending - show check email message
+  const isError = status === 'error';
   return (
-    <Card className="p-8 max-w-md w-full text-center shadow-medium">
-      <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
-      <h2 className="text-xl font-bold text-foreground mb-2">Check your email</h2>
-      <p className="text-text-secondary mb-4">
-        We&apos;ve sent a verification link to your email address. Please click the link to verify your account.
-      </p>
-
-      {error && (
-        <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm mb-4">
-          {error}
+    <AuthShell
+      eyebrow="Step 2 of 3"
+      title={isError ? 'That link didn’t work.' : 'One click left. Check your email.'}
+      description={isError ? 'It may have expired or already been used. Ask for a fresh link below.' : <>We sent a verification link{resendEmail ? <> to <strong className="text-foreground">{resendEmail}</strong></> : ''}. Open it to continue.</>}
+      step="Step 2 of 3"
+      sideTitle="One quick check. Then your page is all yours."
+      footer={<>Already verified? <Link href="/login" className="font-extrabold text-primary hover:underline">Sign in</Link></>}
+    >
+      <div className="space-y-5">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-ink bg-surface-blue text-ink shadow-[4px_4px_0_var(--ink)]">
+          <Mail className="h-6 w-6" />
         </div>
-      )}
 
-      {resendSuccess && (
-        <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm mb-4">
-          Verification email sent!
-        </div>
-      )}
+        {error && <FormAlert tone="error" title="Fresh link needed">{error}</FormAlert>}
+        {resendSuccess && <FormAlert tone="success" title="Sent">A new verification link is in your inbox.</FormAlert>}
 
-      <div className="mb-6 space-y-3">
-        <p className="text-sm text-text-secondary">Didn&apos;t receive the email?</p>
         <Input
+          label="Email address"
           type="email"
-          placeholder="Enter your email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          leadingIcon={<Mail className="h-5 w-5" />}
           value={resendEmail}
-          onChange={(e) => setResendEmail(e.target.value)}
+          onChange={(event) => setResendEmail(event.target.value)}
+          helperText="Use the same email you signed up with."
+          required
         />
-        <Button
-          onClick={handleResendVerification}
-          variant="outline"
-          className="w-full"
-          isLoading={isResending}
-          disabled={!resendEmail}
-        >
-          Resend verification email
+        <Button type="button" variant={isError ? 'primary' : 'outline'} size="lg" className="w-full" isLoading={isResending} disabled={!resendEmail.trim()} onClick={handleResend}>
+          Send me a fresh link
         </Button>
       </div>
-
-      <Button onClick={() => router.push('/login')} variant="ghost" className="w-full">
-        Go to login
-      </Button>
-    </Card>
+    </AuthShell>
   );
 }
 
 function LoadingFallback() {
   return (
-    <Card className="p-8 max-w-md w-full text-center shadow-medium">
-      <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-      <h2 className="text-xl font-bold text-foreground mb-2">Loading...</h2>
-    </Card>
+    <AuthShell eyebrow="Step 2 of 3" title="Opening your verification…" description="Just a second.">
+      <AuthState title="Loading" description="We’re getting your verification ready.">
+        <LoaderCircle className="mx-auto h-6 w-6 animate-spin text-primary" />
+      </AuthState>
+    </AuthShell>
   );
 }
 
 export default function VerifyEmailPage() {
-  return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-      <Suspense fallback={<LoadingFallback />}>
-        <VerifyEmailContent />
-      </Suspense>
-    </div>
-  );
+  return <Suspense fallback={<LoadingFallback />}><VerifyEmailContent /></Suspense>;
 }

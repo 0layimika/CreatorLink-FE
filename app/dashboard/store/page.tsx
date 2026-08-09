@@ -1,20 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Loader2, Upload, Package, ShoppingBag, Search, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Loader2, Upload, Package, ShoppingBag, Search, Pencil, Trash2, X, CircleCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input, Textarea } from '@/components/ui/Input';
+import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
 import { mediaApi, storeApi } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-import type { StoreProduct, StoreOrder, StoreProductType } from '@/types';
+import type { StoreProduct, StoreOrder } from '@/types';
+import { formatCurrency } from '@/lib/utils';
+import { DashboardLoading, DashboardPageHeader, MetricCard } from '@/components/dashboard/DashboardUI';
 
 const defaultProduct = {
-  type: 'physical' as StoreProductType,
   title: '',
   description: '',
   price: 0,
+  compare_at_price: undefined as number | undefined,
   currency: 'NGN',
   cover_url: '',
   file_url: '',
@@ -25,7 +27,7 @@ const defaultProduct = {
   duration_minutes: 30,
   buffer_minutes: 0,
   timezone: 'Africa/Lagos',
-  requires_address: false,
+  requires_address: true,
   track_inventory: true,
   stock_quantity: 0,
 };
@@ -34,6 +36,9 @@ export default function StoreDashboardPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [productsOffset, setProductsOffset] = useState(0);
+  const [productsHasMore, setProductsHasMore] = useState(false);
+  const [productsLoadingMore, setProductsLoadingMore] = useState(false);
   const [orders, setOrders] = useState<StoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,15 +46,22 @@ export default function StoreDashboardPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [productForm, setProductForm] = useState(defaultProduct);
+  const [storeCurrency, setStoreCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [currencyDraft, setCurrencyDraft] = useState<'NGN' | 'USD'>('NGN');
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
+  const [currencyConfirmOpen, setCurrencyConfirmOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [deleteProductTarget, setDeleteProductTarget] = useState<StoreProduct | null>(null);
+  const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
+  const [discountValue, setDiscountValue] = useState('');
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [ordersOffset, setOrdersOffset] = useState(0);
   const pageSize = 10;
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
-  const [productFilter, setProductFilter] = useState<'all' | 'physical'>('all');
   const [productQuery, setProductQuery] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'>('all');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'paid' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'failed' | 'refunded' | 'cancelled' | 'expired'>('all');
   const [orderQuery, setOrderQuery] = useState('');
   const [timelineItem, setTimelineItem] = useState<{ type: 'order'; payload: StoreOrder } | null>(null);
 
@@ -58,12 +70,16 @@ export default function StoreDashboardPage() {
     setError(null);
     try {
       const [productsRes, ordersRes] = await Promise.all([
-        storeApi.listMyProducts({ limit: 50, offset: 0 }),
+        storeApi.listMyProducts({ limit: 12, offset: 0 }),
         storeApi.listOrders({ limit: pageSize, offset: 0 }),
       ]);
 
       if (productsRes.success && productsRes.data) {
-        setProducts(productsRes.data as StoreProduct[]);
+        const loadedProducts = productsRes.data as StoreProduct[];
+        setProducts(loadedProducts);
+        if (loadedProducts[0]?.currency === 'USD' || loadedProducts[0]?.currency === 'NGN') setStoreCurrency(loadedProducts[0].currency);
+        setProductsOffset((productsRes.data as StoreProduct[]).length);
+        setProductsHasMore((productsRes.data as StoreProduct[]).length === 12);
       }
       if (ordersRes.success && ordersRes.data) {
         setOrders(ordersRes.data as StoreOrder[]);
@@ -75,9 +91,47 @@ export default function StoreDashboardPage() {
     }
   };
 
+  const loadMoreProducts = async () => {
+    if (productsLoadingMore || !productsHasMore) return;
+    setProductsLoadingMore(true);
+    try {
+      const response = await storeApi.listMyProducts({ limit: 12, offset: productsOffset });
+      if (response.success && response.data) {
+        const next = response.data as StoreProduct[];
+        setProducts((prev) => [...prev, ...next]);
+        setProductsOffset((prev) => prev + next.length);
+        setProductsHasMore(next.length === 12);
+      }
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to load more products', 'error');
+    } finally {
+      setProductsLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useEffect(() => { void storeApi.getStoreCurrency().then((response) => { if (response.success && response.data) { setStoreCurrency(response.data.currency); setCurrencyDraft(response.data.currency); } }); }, []);
+
+  const saveStoreCurrency = async () => {
+    setIsSavingCurrency(true);
+    try {
+      const response = await storeApi.setStoreCurrency(currencyDraft);
+      if (!response.success) throw new Error(response.message || 'Currency could not be changed');
+      setStoreCurrency(currencyDraft);
+      await fetchAll();
+      addToast('Default store currency saved', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Currency could not be changed', 'error');
+    } finally { setIsSavingCurrency(false); }
+  };
+
+  const requestStoreCurrencyChange = () => {
+    if (currencyDraft === storeCurrency) return;
+    if (products.length) setCurrencyConfirmOpen(true); else void saveStoreCurrency();
+  };
 
   const handleCoverUpload = async (file: File) => {
     const response = await mediaApi.upload(file);
@@ -93,15 +147,23 @@ export default function StoreDashboardPage() {
     setSuccess(null);
     setIsSubmitting(true);
     try {
-      if (!productForm.title || productForm.price <= 0) {
-        throw new Error('Title and price are required');
+      const minimumProductPrice = storeCurrency === 'USD' ? 1 : 1000;
+      if (!productForm.title || productForm.price < minimumProductPrice) {
+        throw new Error(`Title is required and minimum price is ${storeCurrency === 'USD' ? '$1' : '₦1,000'}`);
       }
+      const numericDiscount = Number(discountValue || 0);
+      const compareAtPrice = numericDiscount > 0
+        ? discountType === 'percentage'
+          ? Math.round(productForm.price / Math.max(0.01, 1 - Math.min(numericDiscount, 99) / 100))
+          : Math.round(productForm.price + numericDiscount)
+        : null;
       const payload = {
-        type: productForm.type,
+        type: 'physical' as const,
         title: productForm.title,
         description: productForm.description || null,
-        price: productForm.price,
-        currency: productForm.currency,
+        price: Number(productForm.price),
+        compare_at_price: compareAtPrice === null ? null : Number(compareAtPrice),
+        currency: storeCurrency,
         cover_url: productForm.cover_url || null,
         // download_limit: productForm.type === 'digital' ? (productForm.download_limit || 3) : undefined,
         file_id: productForm.file_id || null,
@@ -111,9 +173,9 @@ export default function StoreDashboardPage() {
         // duration_minutes: productForm.type === 'service' ? productForm.duration_minutes : null,
         // buffer_minutes: productForm.type === 'service' ? productForm.buffer_minutes : null,
         // timezone: productForm.type === 'service' ? productForm.timezone : null,
-        requires_address: productForm.type === 'physical' ? productForm.requires_address : false,
-        track_inventory: productForm.type === 'physical' ? productForm.track_inventory : false,
-        stock_quantity: productForm.type === 'physical' ? productForm.stock_quantity : null,
+        requires_address: true,
+        track_inventory: productForm.track_inventory,
+        stock_quantity: productForm.stock_quantity === null || productForm.stock_quantity === undefined ? null : Number(productForm.stock_quantity),
       };
 
       if (editingProductId) {
@@ -122,6 +184,7 @@ export default function StoreDashboardPage() {
           setSuccess('Product updated successfully');
           setProductForm(defaultProduct);
           setEditingProductId(null);
+          setProductModalOpen(false);
           fetchAll();
         } else {
           throw new Error(response.message || 'Failed to update product');
@@ -131,13 +194,16 @@ export default function StoreDashboardPage() {
         if (response.success) {
           setSuccess('Product created successfully');
           setProductForm(defaultProduct);
+          setProductModalOpen(false);
           fetchAll();
         } else {
           throw new Error(response.message || 'Failed to create product');
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${editingProductId ? 'update' : 'create'} product`);
+      const message = err instanceof Error ? err.message : `Failed to ${editingProductId ? 'update' : 'create'} product`;
+      setError(message);
+      addToast(message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -146,10 +212,10 @@ export default function StoreDashboardPage() {
   const handleEditProduct = (product: StoreProduct) => {
     setEditingProductId(product.id);
     setProductForm({
-      type: product.type,
       title: product.title,
       description: product.description || '',
       price: product.price,
+      compare_at_price: product.compare_at_price || undefined,
       currency: product.currency || 'NGN',
       cover_url: product.cover_url || '',
       file_url: product.file_url || '',
@@ -160,11 +226,17 @@ export default function StoreDashboardPage() {
       duration_minutes: product.duration_minutes || 30,
       buffer_minutes: product.buffer_minutes || 0,
       timezone: product.timezone || 'Africa/Lagos',
-      requires_address: product.requires_address || false,
-      track_inventory: product.track_inventory || false,
+      requires_address: true,
+      track_inventory: product.track_inventory ?? true,
       stock_quantity: product.stock_quantity || 0,
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const discount = product.compare_at_price && product.compare_at_price > product.price
+      ? (discountType === 'percentage'
+        ? String(Math.round((1 - product.price / product.compare_at_price) * 100))
+        : String(product.compare_at_price - product.price))
+      : '';
+    setDiscountValue(discount);
+    setProductModalOpen(true);
   };
 
   const handleCancelEdit = () => {
@@ -172,10 +244,11 @@ export default function StoreDashboardPage() {
     setProductForm(defaultProduct);
     setError(null);
     setSuccess(null);
+    setProductModalOpen(false);
+    setDiscountValue('');
   };
 
   const handleDeleteProduct = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
       const response = await storeApi.deleteProduct(id);
       if (response.success) {
@@ -207,7 +280,7 @@ export default function StoreDashboardPage() {
     }
   };
 
-  const handleUpdateOrderStatus = async (orderId: number, status: 'cancelled' | 'refunded') => {
+  const handleUpdateOrderStatus = async (orderId: number, status: 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded') => {
     try {
       const res = await storeApi.updateOrderStatus(orderId, status);
       if (!res.success) throw new Error(res.message || 'Failed to update order status');
@@ -221,14 +294,14 @@ export default function StoreDashboardPage() {
   const displayName = useMemo(() => user?.username || 'creator', [user]);
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchesType = productFilter === 'all' ? true : p.type === productFilter;
+      const matchesType = p.type === 'physical';
       const q = productQuery.trim().toLowerCase();
       const matchesQuery = q.length === 0
         ? true
         : p.title.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
       return matchesType && matchesQuery;
     });
-  }, [products, productFilter, productQuery]);
+  }, [products, productQuery]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -243,26 +316,16 @@ export default function StoreDashboardPage() {
     });
   }, [orders, orderStatusFilter, orderQuery]);
 
+  const orderStatusLabel = (status: StoreOrder['status']) => ({ pending: 'Awaiting payment', paid: 'Paid', confirmed: 'Confirmed', processing: 'Processing', shipped: 'Shipped', delivered: 'Delivered', failed: 'Payment failed', refunded: 'Refunded', cancelled: 'Cancelled', expired: 'Expired' }[status]);
+  const fulfilmentIndex = (status: StoreOrder['status']) => ({ paid: 0, confirmed: 1, processing: 2, shipped: 2, delivered: 3 } as Record<string, number>)[status] ?? -1;
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardLoading label="Opening your store…" />;
   }
 
   return (
     <div className="space-y-8">
-      <div className="md:hidden p-3 rounded-lg bg-muted border border-border text-text-secondary text-sm">
-        Please open this section on a laptop for the best experience.
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Store</h1>
-        <p className="text-text-secondary mt-1">
-          Manage physical products and orders for @{displayName}
-        </p>
-      </div>
+      <DashboardPageHeader eyebrow="Sell your work" title="Store" description={<>Manage products and orders for <strong className="text-foreground">@{displayName}</strong>.</>} />
 
       {error && (
         <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
@@ -292,28 +355,20 @@ export default function StoreDashboardPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="rounded-xl border border-border bg-card/40 p-3">
-          <p className="text-xs text-text-secondary">Products</p>
-          <p className="text-xl font-semibold text-foreground">{products.length}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card/40 p-3">
-          <p className="text-xs text-text-secondary">Active Products</p>
-          <p className="text-xl font-semibold text-foreground">{products.filter((p) => p.is_active).length}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card/40 p-3">
-          <p className="text-xs text-text-secondary">Orders</p>
-          <p className="text-xl font-semibold text-foreground">{orders.length}</p>
-        </div>
-        {/* <div className="rounded-xl border border-border bg-card/40 p-3">
-          <p className="text-xs text-text-secondary">Bookings</p>
-          <p className="text-xl font-semibold text-foreground">{bookings.length}</p>
-        </div> */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <MetricCard label="Products" value={String(products.length)} icon={Package} tone="pink" />
+        <MetricCard label="Active products" value={String(products.filter((product) => product.is_active).length)} icon={CircleCheck} tone="lime" />
+        <MetricCard label="Orders" value={String(orders.length)} icon={ShoppingBag} tone="ink" />
       </div>
 
       {activeTab === 'products' && (
       <>
-      <Card className="shadow-soft">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-start">
+        <div className="w-full"><h2 className="text-xl font-bold">Products</h2><p className="text-sm text-text-secondary">Physical products your audience can buy.</p><div className="mt-4 flex flex-wrap items-end gap-3"><div><label htmlFor="store-currency" className="text-xs font-black uppercase tracking-[0.12em] text-text-secondary">Default currency</label><select id="store-currency" value={currencyDraft} onChange={(event) => setCurrencyDraft(event.target.value as 'NGN' | 'USD')} className="mt-1 block rounded-xl border border-border bg-background px-3 py-2 text-sm font-bold"><option value="NGN">NGN</option><option value="USD">USD</option></select></div><Button type="button" size="sm" onClick={requestStoreCurrencyChange} disabled={isSavingCurrency || currencyDraft === storeCurrency}>{isSavingCurrency ? 'Saving…' : 'Set as default'}</Button><p className="basis-full text-xs text-text-secondary">All new products and checkouts will use {storeCurrency}.</p></div></div>
+        {currencyConfirmOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"><Card className="w-full max-w-md p-6 shadow-2xl"><CardTitle>Change store currency?</CardTitle><p className="mt-3 text-sm leading-6 text-text-secondary">All {products.length} existing products will be set to {currencyDraft}, deactivated, and require updated prices before you can reactivate them.</p><div className="mt-6 flex justify-end gap-3"><Button variant="outline" onClick={() => setCurrencyConfirmOpen(false)}>Cancel</Button><Button onClick={() => { setCurrencyConfirmOpen(false); void saveStoreCurrency(); }}>Change currency</Button></div></Card></div>}
+        <Button className="shrink-0 sm:mt-1" onClick={() => { setEditingProductId(null); setProductForm(defaultProduct); setDiscountValue(''); setProductModalOpen(true); }}><Plus className="h-4 w-4 mr-2" />Create product</Button>
+      </div>
+      {productModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><button aria-label="Close" className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelEdit} /><Card className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {editingProductId ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
@@ -321,21 +376,8 @@ export default function StoreDashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error && <div className="rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{error}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="text-sm">
-              <span className="block text-text-secondary mb-1">Type</span>
-              <select
-                value={productForm.type}
-                onChange={(e) =>
-                  setProductForm((prev) => ({ ...prev, type: e.target.value as StoreProductType }))
-                }
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
-              >
-                {/* <option value="digital">Digital product</option> */}
-                <option value="physical">Physical product</option>
-                {/* <option value="service">Service (booking)</option> */}
-              </select>
-            </label>
             <Input
               label="Title"
               value={productForm.title}
@@ -352,16 +394,18 @@ export default function StoreDashboardPage() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
-              label="Price (NGN)"
-              type="number"
-              value={productForm.price}
-              onChange={(e) => setProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+              label={`Price (${storeCurrency})`}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={productForm.price || ''}
+              min={storeCurrency === 'USD' ? '1' : '1000'}
+              onChange={(e) => setProductForm((prev) => ({ ...prev, price: Number(e.target.value.replace(/\D/g, '')) || 0 }))}
             />
-            <Input
-              label="Currency"
-              value={productForm.currency}
-              onChange={(e) => setProductForm((prev) => ({ ...prev, currency: e.target.value }))}
-            />
+            <div className="grid grid-cols-2 gap-2"><Select label="Discount" value={discountType} onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'amount')} options={[{ label: 'Percentage', value: 'percentage' }, { label: 'Amount', value: 'amount' }]} /><Input label={discountType === 'percentage' ? 'Discount (%)' : `Discount (${storeCurrency})`} type="number" min="0" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder="Optional" /></div>
+            {products.length === 0 && !editingProductId ? (
+              <Select label="Store currency" value={storeCurrency} onChange={(e) => { const next = e.target.value as 'NGN' | 'USD'; setStoreCurrency(next); setProductForm((prev) => ({ ...prev, currency: next })); }} options={[{ label: 'NGN', value: 'NGN' }, { label: 'USD', value: 'USD' }]} />
+            ) : <Input label="Store currency" value={storeCurrency} readOnly />}
             {/* {productForm.type === 'service' && (
               <Input
                 label="Duration (minutes)"
@@ -399,8 +443,7 @@ export default function StoreDashboardPage() {
             </div>
           )} */}
 
-          {productForm.type === 'physical' && (
-            <div className="space-y-3">
+          <div className="space-y-3">
               <Input
                 label="Available Quantity"
                 type="number"
@@ -419,12 +462,12 @@ export default function StoreDashboardPage() {
                 <input
                   type="checkbox"
                   checked={productForm.requires_address}
-                  onChange={(e) => setProductForm((prev) => ({ ...prev, requires_address: e.target.checked }))}
+                  disabled
+                  onChange={() => undefined}
                 />
-                <span>Require delivery address from buyer</span>
+                <span>Require delivery address from buyer <span className="text-xs text-text-secondary">(required for physical products)</span></span>
               </label>
-            </div>
-          )}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -503,7 +546,7 @@ export default function StoreDashboardPage() {
             )}
           </div>
         </CardContent>
-      </Card>
+      </Card></div>}
 
       <Card className="shadow-soft">
         <CardHeader>
@@ -523,74 +566,60 @@ export default function StoreDashboardPage() {
                 onChange={(e) => setProductQuery(e.target.value)}
               />
             </div>
-            <select
-              className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
-              value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value as typeof productFilter)}
-            >
-              <option value="all">All types</option>
-              <option value="physical">Physical</option>
-              {/* <option value="digital">Digital</option> */}
-              {/* <option value="service">Service</option> */}
-            </select>
           </div>
           {filteredProducts.length === 0 ? (
-            <p className="text-text-secondary text-sm">No products yet.</p>
+            <div className="rounded-2xl border border-dashed border-border bg-background/50 px-6 py-14 text-center"><Package className="mx-auto h-10 w-10 text-text-secondary" /><h3 className="mt-3 text-lg font-semibold">Your store is waiting for its first drop</h3><p className="mx-auto mt-1 max-w-sm text-sm text-text-secondary">Add a physical product and give your audience something lovely to buy.</p><Button className="mt-5" onClick={() => { setEditingProductId(null); setProductForm(defaultProduct); setDiscountValue(''); setProductModalOpen(true); }}><Plus className="h-4 w-4 mr-2" />Create product</Button></div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {filteredProducts.map((product) => (
-                <div key={product.id} className="flex items-center justify-between gap-4 border-b border-border pb-3">
-                  <div className="flex items-center gap-3">
+                <div key={product.id} className="group overflow-hidden rounded-2xl border border-border bg-card/60">
+                  <div className="aspect-[16/10] bg-background">
                     {product.cover_url && (
                       <img
                         src={product.cover_url}
                         alt={product.title}
-                        className="h-10 w-10 rounded-md object-cover border border-border"
+                        className="h-full w-full object-cover"
                       />
                     )}
-                    <div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">{product.title}</p>
                       <p className="text-xs text-text-secondary">
-                        {product.type} • ₦{product.price.toLocaleString()}
-                        {product.type === 'physical' ? ` • Stock: ${product.stock_quantity ?? 0}` : ''}
+                        {formatCurrency(product.price, product.currency || 'NGN')} • Stock: {product.stock_quantity ?? 0}
+                        {product.compare_at_price && product.compare_at_price > product.price ? ` • ${Math.round((1 - product.price / product.compare_at_price) * 100)}% off` : ''}
                       </p>
                     </div>
-                  </div>
-                  <span className={`text-[10px] px-2 py-1 rounded-full border ${product.is_active ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/40 text-amber-300 bg-amber-500/10'}`}>
-                    {product.is_active ? 'ACTIVE' : 'INACTIVE'}
-                  </span>
-                  <div className="flex gap-2">
+                    <div className="flex gap-1 opacity-70 group-hover:opacity-100"><button aria-label={`Edit ${product.title}`} className="rounded-lg p-2 hover:bg-primary/10" onClick={() => handleEditProduct(product)}><Pencil className="h-4 w-4" /></button><button aria-label={`Delete ${product.title}`} className="rounded-lg p-2 text-error hover:bg-error/10" onClick={() => setDeleteProductTarget(product)}><Trash2 className="h-4 w-4" /></button></div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
                     <Button
                       size="sm"
                       variant={product.is_active ? 'outline' : 'primary'}
+                      className={product.is_active ? 'border-error text-error hover:bg-error/10' : ''}
                       onClick={() => handleToggleProduct(product)}
                     >
                       {product.is_active ? 'Deactivate' : 'Activate'}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditProduct(product)}
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-error border-error/20 hover:bg-error/10"
-                      onClick={() => handleDeleteProduct(product.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" />
-                      Delete
-                    </Button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+          {productsHasMore && filteredProducts.length > 0 && (
+            <div className="mt-6 flex justify-center">
+              <Button variant="outline" onClick={loadMoreProducts} disabled={productsLoadingMore}>
+                {productsLoadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Load more products
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {deleteProductTarget && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"><button aria-label="Close" className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteProductTarget(null)} /><Card className="relative z-10 w-full max-w-md shadow-2xl"><CardContent className="p-6"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-error/10 text-error"><Trash2 className="h-5 w-5" /></div><h2 className="mt-4 text-xl font-bold">Delete “{deleteProductTarget.title}”?</h2><p className="mt-2 text-sm text-text-secondary">This removes the product from your store. Existing paid orders will remain in your order history.</p><div className="mt-6 flex justify-end gap-3"><Button variant="outline" onClick={() => setDeleteProductTarget(null)}>Keep product</Button><Button className="bg-error text-white hover:bg-error/90" onClick={async () => { const target = deleteProductTarget; setDeleteProductTarget(null); await handleDeleteProduct(target.id); }}>Delete product</Button></div></CardContent></Card></div>}
 
       {/* <Card className="shadow-soft">
         <CardHeader>
@@ -852,41 +881,40 @@ export default function StoreDashboardPage() {
                   onChange={(e) => setOrderQuery(e.target.value)}
                 />
               </div>
-              <select
-                className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              <Select
+                className="sm:w-52"
                 value={orderStatusFilter}
                 onChange={(e) => setOrderStatusFilter(e.target.value as typeof orderStatusFilter)}
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="failed">Failed</option>
-                <option value="refunded">Refunded</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                options={[
+                  { label: 'All statuses', value: 'all' },
+                  { label: 'Pending', value: 'pending' },
+                  { label: 'Paid', value: 'paid' },
+                  { label: 'Confirmed', value: 'confirmed' },
+                  { label: 'Processing', value: 'processing' },
+                  { label: 'Shipped', value: 'shipped' },
+                  { label: 'Delivered', value: 'delivered' },
+                  { label: 'Failed', value: 'failed' },
+                  { label: 'Refunded', value: 'refunded' },
+                  { label: 'Cancelled', value: 'cancelled' },
+                  { label: 'Expired', value: 'expired' },
+                ]}
+              />
             </div>
             {filteredOrders.length === 0 ? (
               <p className="text-text-secondary text-sm">No orders yet.</p>
             ) : (
               <div className="space-y-3">
                 {filteredOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between border-b border-border pb-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{order.product?.title || 'Product'}</p>
-                      <p className="text-xs text-text-secondary">{order.buyer_email}</p>
-                      <p className="text-xs text-text-secondary">
-                        ₦{order.amount.toLocaleString()} •
-                        <span className={`ml-1 px-1.5 py-0.5 rounded border ${
-                          order.status === 'paid' ? 'border-emerald-500/40 text-emerald-300'
-                            : order.status === 'pending' ? 'border-amber-500/40 text-amber-300'
-                            : 'border-red-500/40 text-red-300'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </p>
+                  <div key={order.id} className="rounded-2xl border border-border bg-card/60 p-4 shadow-soft">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2"><p className="text-base font-bold text-foreground">{order.product?.title || 'Product'}</p><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${['paid', 'confirmed', 'processing', 'shipped', 'delivered'].includes(order.status) ? 'bg-emerald-500/15 text-emerald-700' : order.status === 'pending' ? 'bg-amber-500/15 text-amber-700' : 'bg-error/10 text-error'}`}>{orderStatusLabel(order.status)}</span></div>
+                      <p className="mt-1 text-sm text-text-secondary">{order.buyer_name || 'Customer'} · {order.buyer_email}</p>
+                      <p className="mt-2 text-lg font-black text-foreground">{formatCurrency(order.amount, order.currency || 'NGN')} <span className="text-xs font-normal text-text-secondary">· {order.item_count || 1} item{(order.item_count || 1) === 1 ? '' : 's'}</span></p>
+                      <p className="mt-1 text-xs text-text-secondary">Order {order.reference} · {order.created_at ? new Date(order.created_at).toLocaleString() : 'Recent'}</p>
+                      {fulfilmentIndex(order.status) >= 0 && <div className="mt-4 flex max-w-xl items-center gap-1">{['Paid', 'Confirmed', 'Processing', 'Delivered'].map((step, index) => <div key={step} className="flex flex-1 items-center gap-1"><div className={`h-1.5 flex-1 rounded-full ${index <= fulfilmentIndex(order.status) ? 'bg-primary' : 'bg-border'}`} /><span className={`hidden text-[10px] sm:block ${index <= fulfilmentIndex(order.status) ? 'text-foreground' : 'text-text-secondary'}`}>{step}</span></div>)}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <span className="text-xs text-text-secondary">{order.reference}</span>
                       <Button
                         size="sm"
                         variant="outline"
@@ -902,6 +930,15 @@ export default function StoreDashboardPage() {
                         >
                           Cancel
                         </Button>
+                      )}
+                      {order.status === 'paid' && (
+                        <Button size="sm" onClick={() => handleUpdateOrderStatus(order.id, 'confirmed')}>Confirm order</Button>
+                      )}
+                      {order.status === 'confirmed' && (
+                        <Button size="sm" onClick={() => handleUpdateOrderStatus(order.id, 'processing')}>Start processing</Button>
+                      )}
+                      {['processing', 'shipped'].includes(order.status) && (
+                        <Button size="sm" onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}>Mark delivered</Button>
                       )}
                       {order.status === 'paid' && (
                         <Button
@@ -932,6 +969,7 @@ export default function StoreDashboardPage() {
                           Resend Email
                         </Button>
                       )}
+                    </div>
                     </div>
                   </div>
                 ))}

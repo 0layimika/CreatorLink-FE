@@ -9,6 +9,7 @@ interface Creator {
     username: string;
     first_name: string;
     last_name: string;
+    display_name?: string | null;
     bio?: string;
     avatar_url?: string;
     user_id: number;
@@ -31,7 +32,7 @@ interface AuthContextType {
     isLoading: boolean;
     isAuthenticated: boolean;
     login: (email: string, password: string) => Promise<void>;
-    register: (data: RegisterData) => Promise<{ verificationLink: string }>;
+    register: (data: RegisterData) => Promise<void>;
     verify: (token: string) => Promise<void>;
     createCreator: (data: CreatorData) => Promise<void>;
     updateCreator: (data: Partial<CreatorData>) => Promise<void>;
@@ -49,6 +50,7 @@ interface CreatorData {
     username: string;
     first_name: string;
     last_name: string;
+    display_name?: string | null;
     bio?: string;
     avatar_url?: string;
 }
@@ -102,26 +104,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authApi.login({ email, password });
 
             if (response.success && response.data) {
-                const { token, creator: creatorData } = response.data as { token: string; creator: Creator };
+                const { token, creator: creatorData, user: responseUser } = response.data as {
+                    token: string;
+                    creator: Creator | null;
+                    user?: { id: number; email: string; verified: boolean };
+                };
                 localStorage.setItem('auth_token', token);
-                localStorage.setItem('creator', JSON.stringify(creatorData));
+                if (creatorData) localStorage.setItem('creator', JSON.stringify(creatorData));
+                else localStorage.removeItem('creator');
 
-                // Map creator to user format for compatibility
-                const userData: User = {
+                const userData: User = creatorData ? {
                     id: creatorData.user_id,
-                    email: email,
+                    email,
                     username: creatorData.username,
                     firstName: creatorData.first_name,
                     lastName: creatorData.last_name,
                     bio: creatorData.bio,
                     avatar: creatorData.avatar_url,
                     verified: true,
+                } : {
+                    id: responseUser?.id || 0,
+                    email: responseUser?.email || email,
+                    verified: responseUser?.verified ?? true,
                 };
                 localStorage.setItem('user', JSON.stringify(userData));
 
                 setUser(userData);
                 setCreator(creatorData);
-                router.push('/dashboard');
+                router.push(creatorData ? '/dashboard' : '/setup-creator');
             } else {
                 throw new Error(response.message || 'Login failed');
             }
@@ -130,20 +140,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [router]);
 
-    const register = useCallback(async (data: RegisterData): Promise<{ verificationLink: string }> => {
+    const register = useCallback(async (data: RegisterData): Promise<void> => {
         setIsLoading(true);
         try {
             const response = await authApi.register(data);
 
             if (response.success && response.data) {
-                const { user: userData, verificationLink } = response.data as { user: any; verificationLink: string };
+                const { user: userData } = response.data as { user: { id: number; email: string } };
                 // Store user temporarily (not verified yet)
                 setUser({
                     id: userData.id,
                     email: userData.email,
                     verified: false,
                 });
-                return { verificationLink };
+                return;
             } else {
                 throw new Error(response.message || 'Registration failed');
             }
@@ -158,7 +168,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authApi.verify(token);
 
             if (response.success && response.data) {
-                const { user: userData, token: accessToken } = response.data as { user: any; token: string };
+                const { user: userData, token: accessToken } = response.data as {
+                    user: { id: number; email: string };
+                    token: string;
+                };
                 localStorage.setItem('auth_token', accessToken);
                 localStorage.setItem('user', JSON.stringify({
                     id: userData.id,
@@ -170,15 +183,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     email: userData.email,
                     verified: true,
                 });
-                // After verification, redirect to creator setup
-                router.push('/setup-creator');
             } else {
                 throw new Error(response.message || 'Verification failed');
             }
         } finally {
             setIsLoading(false);
         }
-    }, [router]);
+    }, []);
 
     const createCreator = useCallback(async (data: CreatorData) => {
         setIsLoading(true);

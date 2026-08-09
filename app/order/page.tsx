@@ -6,6 +6,8 @@ import { Loader2, Download, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { storeApi } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
+import type { StoreOrder } from '@/types';
 
 function OrderContent() {
   const searchParams = useSearchParams();
@@ -80,36 +82,31 @@ function OrderContent() {
     );
   }
 
-  const statusIcon =
-    orderData.status === 'paid' ? (
-      <CheckCircle className="h-6 w-6 text-success" />
-    ) : (
-      <XCircle className="h-6 w-6 text-error" />
-    );
+  const orderStatus = orderData.status as StoreOrder['status'];
+  const paid = ['paid', 'confirmed', 'processing', 'shipped', 'delivered'].includes(orderStatus);
+  const steps = ['paid', 'confirmed', 'processing', 'delivered'];
+  const currentStep = orderStatus === 'shipped' ? 2 : steps.indexOf(orderStatus);
+  const statusCopy = ({
+    paid: { title: 'Payment received.', body: 'The creator has your order and will confirm it shortly.' },
+    confirmed: { title: 'Order confirmed.', body: 'Your order has been reviewed and is ready for fulfilment.' },
+    processing: { title: 'Order in progress.', body: 'The creator is preparing your order now.' },
+    shipped: { title: 'Order in progress.', body: 'Your order is on its way.' },
+    delivered: { title: 'Order delivered.', body: 'Your order has been marked as delivered.' },
+  } as Partial<Record<StoreOrder['status'], { title: string; body: string }>>)[orderStatus];
 
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-medium">
-        <CardContent className="p-8 space-y-4">
-          <div className="flex items-center gap-3">
-            {statusIcon}
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Order Status</h2>
-              <p className="text-text-secondary capitalize">{orderData.status}</p>
-            </div>
+    <div className="min-h-screen bg-[#f7f4ec] px-4 py-8 text-foreground sm:py-12">
+      <Card className="mx-auto w-full max-w-2xl overflow-hidden border-ink shadow-[6px_6px_0_var(--ink)]">
+        <CardContent className="p-0">
+          <div className={`p-6 sm:p-8 ${paid ? 'bg-secondary text-ink' : 'bg-error text-white'}`}>
+            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.16em] opacity-65">LinkVerse receipt</p><h1 className="mt-3 font-display text-3xl font-black tracking-[-0.05em] sm:text-4xl">{paid ? statusCopy?.title : 'Order needs attention.'}</h1><p className="mt-2 text-sm font-semibold opacity-75">{paid ? statusCopy?.body : 'This order is not currently payable.'}</p></div>{paid ? <CheckCircle className="h-10 w-10 shrink-0" /> : <XCircle className="h-10 w-10 shrink-0" />}</div>
+            <div className="mt-7 grid grid-cols-4 gap-3">{steps.map((step, index) => <div key={step} className="min-w-0 text-center"><div className={`mx-auto h-2 w-full rounded-full ${index <= currentStep && paid ? 'bg-ink' : 'bg-black/15'}`} /><p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] opacity-65 sm:text-[10px]">{step}</p></div>)}</div>
           </div>
-
-          <div className="border-t border-border pt-4 space-y-2 text-sm text-text-secondary">
-            {orderData.product?.title && <p>Product: {orderData.product.title}</p>}
-            {Array.isArray(orderData.items) && orderData.items.length > 0 && (
-              <p>Items: {orderData.items.length}</p>
-            )}
-            <p>Reference: <span className="font-mono">{orderData.reference}</span></p>
-            <p>Subtotal: ₦{Number(orderData.subtotal ?? orderData.amount).toLocaleString()}</p>
-            <p>Platform Fee (2.5%): ₦{Number(orderData.platform_fee ?? 0).toLocaleString()}</p>
-            <p>Total: ₦{Number(orderData.total ?? orderData.amount).toLocaleString()}</p>
-            <p>Buyer Email: {orderData.buyer_email}</p>
-          </div>
+          <div className="space-y-6 p-6 sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.13em] text-text-secondary">Order reference</p><p className="mt-1 break-all font-mono text-sm font-bold">{orderData.reference}</p></div><span className="rounded-full border border-border px-3 py-1 text-xs font-black capitalize">{orderData.status}</span></div>
+            <div className="rounded-2xl border border-border bg-background p-4"><p className="text-xs font-black uppercase tracking-[0.13em] text-text-secondary">Items</p><div className="mt-3 space-y-3">{(orderData.items?.length ? orderData.items : [{ title_snapshot: orderData.product?.title || 'Order', quantity: 1, line_total: orderData.subtotal ?? orderData.amount }]).map((item: any, index: number) => <div key={item.id || index} className="flex justify-between gap-4 text-sm"><span>{item.title_snapshot || item.title} × {item.quantity}</span><span className="font-semibold">{formatCurrency(Number(item.line_total || 0), orderData.currency || 'NGN')}</span></div>)}</div></div>
+            <div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-text-secondary">Subtotal</span><span>{formatCurrency(Number(orderData.subtotal ?? orderData.amount ?? 0), orderData.currency || 'NGN')}</span></div><div className="flex justify-between"><span className="text-text-secondary">Platform fee</span><span>{formatCurrency(Number(orderData.platform_fee) || Number(orderData.platform_fee_minor || 0) / 100, orderData.currency || 'NGN')}</span></div><div className="flex justify-between border-t border-border pt-3 text-lg font-black"><span>Total paid</span><span>{formatCurrency(Number(orderData.total ?? orderData.amount ?? 0), orderData.currency || 'NGN')}</span></div></div>
+            <div className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2"><div><p className="text-xs font-black uppercase tracking-[0.13em] text-text-secondary">Buyer</p><p className="mt-1 font-semibold">{orderData.buyer_name || '—'}</p><p className="text-text-secondary">{orderData.buyer_email}</p></div><div><p className="text-xs font-black uppercase tracking-[0.13em] text-text-secondary">Delivery</p><p className="mt-1 font-semibold">{orderData.delivery_address?.address || 'Address on order'}</p></div></div>
 
           {downloadToken && orderData.status === 'paid' && (
             <Button onClick={() => { void handleDownload(); }} disabled={downloadLoading} className="w-full shadow-soft">
@@ -126,6 +123,7 @@ function OrderContent() {
               ))}
             </div>
           )}
+          </div>
         </CardContent>
       </Card>
     </div>

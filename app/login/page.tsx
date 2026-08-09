@@ -2,141 +2,113 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { ArrowRight, KeyRound, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
-import { BrandWordmark } from '@/components/ui/BrandWordmark';
+import { Input, PasswordInput } from '@/components/ui/Input';
+import { AuthShell, FormAlert } from '@/components/auth/AuthShell';
 import { authApi } from '@/lib/api';
-import { CheckCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [formData, setFormData] = useState({ email: '', password: '' });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
-    setSuccess(null);
+    setNeedsVerification(false);
+    setResendSuccess(false);
 
     try {
-      await login(formData.email, formData.password);
+      await login(formData.email.trim().toLowerCase(), formData.password);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
-      
-      // Check if error is about account verification
-      if (errorMessage.toLowerCase().includes('verify account') || errorMessage.toLowerCase().includes('please verify')) {
-        // Automatically resend verification email
-        setIsResending(true);
-        try {
-          const response = await authApi.resendVerification(formData.email);
-          if (response.success) {
-            setSuccess('Verification email sent! Please check your email inbox (and spam folder) for the verification link.');
-          } else {
-            setError(response.message || 'Failed to resend verification email. Please try again.');
-          }
-        } catch {
-          setError('Failed to resend verification email. Please try again later.');
-        } finally {
-          setIsResending(false);
-        }
-      } else {
-        setError(errorMessage);
-      }
+      const message = err instanceof Error ? err.message : 'We could not log you in. Please try again.';
+      const isUnverified = message.toLowerCase().includes('verify account') || message.toLowerCase().includes('please verify');
+      setNeedsVerification(isUnverified);
+      setError(isUnverified ? 'Your email still needs verifying before you can continue.' : message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    setResendSuccess(false);
+    try {
+      await authApi.resendVerification(formData.email.trim().toLowerCase());
+      setResendSuccess(true);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'We could not resend the email. Please try again.');
+    } finally {
+      setIsResending(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <BrandWordmark textClassName="font-display text-2xl font-bold text-foreground" imageClassName="h-9 w-9 rounded-lg" /></Link>
-          <h1 className="mt-6 text-2xl font-bold text-foreground">
-            Welcome back
-          </h1>
-          <p className="mt-2 text-text-secondary">
-            Log in to your account to continue
-          </p>
+    <AuthShell
+      eyebrow="Welcome back"
+      title="Good to see you."
+      description="Your links have been holding the fort. Sign in and pick up where you left off."
+      sideTitle="Your corner of the internet missed you."
+      footer={<>New around here? <Link href="/signup" className="font-extrabold text-primary hover:underline">Create your free account</Link></>}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {error && (
+          <FormAlert
+            tone="error"
+            title={needsVerification ? 'One quick thing' : 'That did not work'}
+            action={needsVerification ? (
+              <button type="button" onClick={handleResendVerification} disabled={isResending} className="font-extrabold underline underline-offset-4 disabled:opacity-50">
+                {isResending ? 'Sending…' : 'Resend verification email'}
+              </button>
+            ) : undefined}
+          >
+            {error}
+          </FormAlert>
+        )}
+
+        {resendSuccess && (
+          <FormAlert tone="success" title="Email sent">
+            Check your inbox for a fresh verification link.
+          </FormAlert>
+        )}
+
+        <Input
+          label="Email address"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          leadingIcon={<Mail className="h-5 w-5" />}
+          value={formData.email}
+          onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
+          required
+        />
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-bold text-foreground">Password <span className="text-primary">*</span></span>
+            <Link href="/forgot-password" className="text-xs font-extrabold text-primary hover:underline">Forgot it?</Link>
+          </div>
+          <PasswordInput
+            aria-label="Password"
+            autoComplete="current-password"
+            placeholder="Your password"
+            leadingIcon={<KeyRound className="h-5 w-5" />}
+            value={formData.password}
+            onChange={(event) => setFormData((current) => ({ ...current, password: event.target.value }))}
+            required
+          />
         </div>
 
-        <Card className="p-6 shadow-medium">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
-                {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="p-4 rounded-lg bg-success/10 border border-success/20">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-success font-medium text-sm mb-1">Verification Email Sent!</p>
-                    <p className="text-success/80 text-sm">{success}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              required
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              required
-            />
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border bg-card text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-text-secondary">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button type="submit" className="w-full" isLoading={isLoading || isResending} disabled={isResending}>
-              {isResending ? 'Sending verification email...' : 'Log in'}
-            </Button>
-          </form>
-        </Card>
-
-        <p className="mt-6 text-center text-sm text-text-secondary">
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-primary hover:underline font-medium">
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Button type="submit" size="lg" className="w-full" isLoading={isLoading}>
+          Sign in
+          {!isLoading && <ArrowRight className="h-5 w-5" />}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

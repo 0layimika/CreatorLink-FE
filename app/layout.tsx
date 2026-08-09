@@ -3,9 +3,9 @@ import { AppProviders } from '@/components/providers/AppProviders';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'LinkVerse - Links & Tips for Creators',
+  title: 'LinkVerse — Your whole creator world, one link',
   description:
-    'The all-in-one link-in-bio platform for creators. Consolidate your social profiles, accept tips, track analytics, and grow your audience.',
+    'Bring your content, shop, bookings and supporter gifts together in one link that feels like you.',
   keywords: ['creator', 'link in bio', 'social media', 'analytics', 'tips', 'linkverse'],
   icons: {
     icon: [
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

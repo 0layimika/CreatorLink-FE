@@ -1,77 +1,72 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { analyticsApi } from '@/lib/api';
 
-interface AnalyticsOverview {
+export type AnalyticsPeriod = 'today' | 'this_week' | 'this_month' | 'all_time';
+
+interface AnalyticsApiResponse {
+  period?: AnalyticsPeriod;
+  summary?: {
+    total_profile_views?: number;
+    total_link_clicks?: number;
+    unique_visitors?: number;
+    profile_views_change?: number;
+    link_clicks_change?: number;
+  };
+  daily_breakdown?: Array<{ date: string; views?: number; clicks?: number }>;
+  top_links?: Array<{ link_id?: number; title?: string; url?: string; clicks?: number }>;
+  top_sources?: Array<{ source?: string; visits?: number }>;
+}
+
+export interface AnalyticsOverview {
+  period: AnalyticsPeriod;
   totalViews: number;
   totalClicks: number;
+  uniqueVisitors: number;
   viewsChange: number;
   clicksChange: number;
   dailyStats: Array<{ date: string; views: number; clicks: number }>;
-  topLinks: Array<{ id: string; title: string; url?: string; clicks: number }>;
+  topLinks: Array<{ id: string; title: string; url: string; clicks: number }>;
+  topSources: Array<{ source: string; visits: number }>;
 }
 
-interface UseAnalyticsReturn {
-  overview: AnalyticsOverview | null;
-  isLoading: boolean;
-  error: string | null;
-  refetch: (params?: { startDate?: string; endDate?: string }) => Promise<void>;
-}
-
-export function useAnalytics(params?: { startDate?: string; endDate?: string }): UseAnalyticsReturn {
+export function useAnalytics(initialPeriod: AnalyticsPeriod = 'this_week') {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [period, setPeriod] = useState<AnalyticsPeriod>(initialPeriod);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOverview = useCallback(async (fetchParams?: { startDate?: string; endDate?: string }) => {
+  const fetchOverview = useCallback(async (nextPeriod: AnalyticsPeriod = period) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await analyticsApi.getOverview(fetchParams);
-      console.log('Analytics API response:', response);
-      if (response.success && response.data) {
-        // Map backend response structure to frontend expected structure
-        const backendData = response.data as any;
-        console.log('Backend data:', backendData);
-        console.log('Summary:', backendData.summary);
-        const mappedData: AnalyticsOverview = {
-          totalViews: backendData.summary?.total_profile_views || 0,
-          totalClicks: backendData.summary?.total_link_clicks || 0,
-          viewsChange: backendData.summary?.profile_views_change || 0,
-          clicksChange: backendData.summary?.link_clicks_change || 0,
-          dailyStats: (backendData.daily_breakdown || []).map((item: any) => ({
-            date: item.date,
-            views: item.views || 0,
-            clicks: item.clicks || 0,
-          })),
-          topLinks: (backendData.top_links || []).map((link: any) => ({
-            id: link.link_id?.toString() || '',
-            title: link.title || '',
-            url: link.url || '',
-            clicks: link.clicks || 0,
-          })),
-        };
-        console.log('Mapped analytics data:', mappedData);
-        setOverview(mappedData);
-      }
+      const response = await analyticsApi.getOverview(nextPeriod);
+      if (!response.success || !response.data) throw new Error(response.message || 'Failed to fetch analytics');
+      const data = response.data as AnalyticsApiResponse;
+      setOverview({
+        period: data.period || nextPeriod,
+        totalViews: data.summary?.total_profile_views || 0,
+        totalClicks: data.summary?.total_link_clicks || 0,
+        uniqueVisitors: data.summary?.unique_visitors || 0,
+        viewsChange: data.summary?.profile_views_change || 0,
+        clicksChange: data.summary?.link_clicks_change || 0,
+        dailyStats: (data.daily_breakdown || []).map((item) => ({ date: item.date, views: item.views || 0, clicks: item.clicks || 0 })),
+        topLinks: (data.top_links || []).map((link) => ({ id: String(link.link_id || ''), title: link.title || 'Untitled link', url: link.url || '', clicks: link.clicks || 0 })),
+        topSources: (data.top_sources || []).map((source) => ({ source: source.source || 'direct', visits: source.visits || 0 })),
+      });
     } catch (err) {
-      console.error('Analytics fetch error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [period]);
 
-  useEffect(() => {
-    fetchOverview(params);
-  }, [fetchOverview, params?.startDate, params?.endDate]);
+  useEffect(() => { void fetchOverview(period); }, [fetchOverview, period]);
 
-  return {
-    overview,
-    isLoading,
-    error,
-    refetch: fetchOverview,
+  const changePeriod = (nextPeriod: AnalyticsPeriod) => {
+    if (nextPeriod !== period) setPeriod(nextPeriod);
   };
-}
 
+  return { overview, period, setPeriod: changePeriod, isLoading, error, refetch: () => fetchOverview(period) };
+}

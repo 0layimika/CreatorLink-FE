@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { mediaApi } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardUI';
 
 export default function SettingsPage() {
   const { user, creator, updateCreator, isLoading: authLoading } = useAuth();
@@ -128,13 +129,8 @@ export default function SettingsPage() {
   const displayName = `${formData.first_name} ${formData.last_name}`.trim() || formData.username || 'Creator';
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-text-secondary mt-1">
-          Manage your profile and account settings
-        </p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <DashboardPageHeader eyebrow="Account" title="Settings" description="Keep your public identity and account details up to date." />
 
       <form onSubmit={handleSubmit}>
         <Card className="shadow-soft">

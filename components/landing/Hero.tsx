@@ -1,88 +1,120 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { LayoutDashboard } from 'lucide-react';
-import { BackgroundPathsLayer } from '@/components/ui/background-paths';
-import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
+import { ArrowRight, BarChart3, Gift, Play, ShoppingBag, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import Image from 'next/image';
+
+const profileLinks = [
+  { label: 'My latest drop', icon: ShoppingBag, tone: 'bg-secondary text-ink' },
+  { label: 'Watch the new vlog', icon: Play, tone: 'bg-surface-pink text-ink' },
+  { label: 'Work with me', icon: Sparkles, tone: 'bg-surface-blue text-ink' },
+];
 
 export function Hero() {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
 
   return (
-    <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 border-b border-border bg-transparent overflow-hidden">
-      <BackgroundPathsLayer />
-      <div className="relative max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          <div className="lg:col-span-7">
-            <div className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 text-xs text-text-secondary tracking-wide uppercase mb-6">
-              Built for modern creators
+    <section className="overflow-hidden border-b border-border pt-14 sm:pt-20 lg:pt-24">
+      <div className="page-shell">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16">
+          <div className="pb-4 lg:pb-14">
+            <div className="eyebrow mb-7">
+              <span className="h-2 w-2 rounded-full bg-secondary" />
+              Your corner of the internet
             </div>
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl leading-tight text-foreground mb-6">
-              Turn your link in bio into a money-making machine
+            <h1 className="display-hero max-w-[920px]">
+              One link.
+              <br />
+              Your whole <span className="text-primary">creator world.</span>
             </h1>
-            <p className="text-base sm:text-lg text-text-secondary max-w-2xl mb-8 leading-relaxed">
-              Create a stunning creator page, receive gifts, showcase your work,
-              and turn followers into supporters — all in one place.
+            <p className="mt-7 max-w-xl text-lg leading-8 text-text-secondary sm:text-xl">
+              Put your content, shop, bookings and tip jar in one lovely page that feels like you—not a boring list of buttons.
             </p>
-            {isAuthenticated ? (
-              <Link href="/dashboard">
-                <span className="inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-semibold text-foreground hover:bg-muted">
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Go to dashboard
-                </span>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link href={isAuthenticated ? '/dashboard' : '/signup'} className="brand-button brand-button-lg">
+                {isAuthenticated ? 'Open your dashboard' : 'Claim your LinkVerse'}
+                <ArrowRight className="h-5 w-5" />
               </Link>
-            ) : (
-              <InteractiveHoverButton
-                text="get your linkverse"
-                className="w-52 border-border bg-transparent text-foreground"
-                onClick={() => router.push('/signup')}
-              />
-            )}
-            <div className="mt-8 space-y-2">
-              <p className="text-sm text-text-secondary">
-                Used by creators, designers, influencers &amp; online brands
-              </p>
-              <p className="text-sm text-text-secondary">
-                Built for creators who want to earn from attention
-              </p>
+              <a href="#features" className="brand-button brand-button-lg brand-button-secondary">
+                Show me around
+              </a>
             </div>
+            <p className="mt-5 text-sm font-medium text-text-secondary">
+              Start free · Set up in minutes · Make it very, very you
+            </p>
           </div>
 
-          <div className="lg:col-span-5">
-            <div className="h-full rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-soft">
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-border bg-muted p-4">
-                  <p className="text-xs uppercase tracking-wide text-text-secondary mb-2">
-                    Live profile preview
-                  </p>
-                  <p className="font-display text-lg text-foreground">@amara.creates</p>
-                  <p className="text-sm text-text-secondary mt-1">Fashion, beauty, lifestyle</p>
+          <div className="relative mx-auto w-full max-w-[570px] pb-16 lg:pb-24">
+            <div className="absolute -left-8 top-20 hidden rotate-[-9deg] rounded-[28px] border border-ink bg-secondary px-5 py-4 text-ink shadow-sticker sm:block">
+              <Gift className="mb-7 h-5 w-5" />
+              <p className="text-xs font-bold uppercase tracking-[0.14em]">New gift</p>
+              <p className="font-display text-2xl font-black">₦25,000</p>
+            </div>
+
+            <div className="relative mx-auto aspect-[1204/2448] w-[min(100%,390px)] drop-shadow-2xl">
+              <div
+                className="absolute inset-[1.8%_4%_1.8%] overflow-hidden bg-[#f7f3ff] p-[5%] text-ink sm:p-[6%]"
+                style={{ borderRadius: 'clamp(24px, 8.5vw, 46px)' }}
+              >
+                <div className="mx-auto mb-5 h-1.5 w-16 rounded-full bg-ink/20" />
+                <div className="rounded-[28px] bg-primary p-5 text-white">
+                  <div className="flex items-center gap-4">
+                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-2 border-white bg-surface-pink text-xl font-black text-ink">
+                      AM
+                    </div>
+                    <div>
+                      <p className="font-display text-xl font-black tracking-tight">Amara makes things</p>
+                      <p className="mt-1 text-sm text-white/75">Style, stories &amp; soft life ✨</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Instagram', 'Store', 'Media Kit', 'Book Service'].map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"
-                    >
-                      {item}
+
+                <div className="mt-4 space-y-3">
+                  {profileLinks.map(({ label, icon: Icon, tone }) => (
+                    <div key={label} className={`flex items-center justify-between rounded-2xl border border-ink px-4 py-4 font-bold ${tone}`}>
+                      <span>{label}</span>
+                      <Icon className="h-5 w-5" />
                     </div>
                   ))}
                 </div>
-                <div className="rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3">
-                  <p className="text-sm text-foreground">
-                    Gift received: <span className="font-semibold">$25</span>
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-cyan-50 border border-cyan-200 px-4 py-3">
-                  <p className="text-sm text-foreground">
-                    Today: <span className="font-semibold">128 profile visits</span>
-                  </p>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-ink bg-white p-4">
+                    <Gift className="h-5 w-5 text-primary" />
+                    <p className="mt-4 text-xs font-bold uppercase text-ink/50">Supporters</p>
+                    <p className="text-xl font-black">128</p>
+                  </div>
+                  <div className="rounded-2xl border border-ink bg-white p-4">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <p className="mt-4 text-xs font-bold uppercase text-ink/50">Clicks today</p>
+                    <p className="text-xl font-black">2.4k</p>
+                  </div>
                 </div>
               </div>
+              <Image
+                src="/assets/phone/velio-iphone-frame.png"
+                alt=""
+                fill
+                sizes="(max-width: 640px) 390px, 390px"
+                className="pointer-events-none absolute inset-0 object-contain"
+                aria-hidden="true"
+              />
             </div>
+
+            <div className="absolute bottom-7 right-0 rotate-[7deg] rounded-[28px] border border-ink bg-surface-pink px-5 py-4 text-ink shadow-sticker sm:right-3">
+              <p className="text-xs font-bold uppercase tracking-[0.14em]">Your page</p>
+              <p className="mt-1 font-display text-xl font-black">looks good on you.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 flex flex-col gap-5 border-t border-border py-7 sm:flex-row sm:items-center sm:justify-between lg:mt-0">
+          <p className="max-w-md font-display text-xl font-bold tracking-tight text-foreground">
+            Made for people building something of their own.
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-text-secondary">
+            <span>CREATORS</span><span>DESIGNERS</span><span>COACHES</span><span>FOUNDERS</span>
           </div>
         </div>
       </div>

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { walletApi, giftApi } from '@/lib/api';
+import { walletApi } from '@/lib/api';
 
 interface WalletData {
     balance: number;
     pending: number;
     currency: string;
+    wallets?: Array<{ id: number; balance: number; currency: string }>;
 }
 
 interface Transaction {
@@ -44,13 +45,14 @@ interface UseWalletReturn {
     bankAccount: BankAccount | null;
     isLoading: boolean;
     error: string | null;
-    withdraw: (amount: number) => Promise<void>;
+    withdraw: (amount: number, currency: 'NGN' | 'USD', password: string) => Promise<void>;
     setBankAccount: (data: { account_number: string; bank_code: string; account_name: string }) => Promise<void>;
     resolveAccount: (accountNumber: string, bankCode: string) => Promise<{ account_name: string }>;
+    loadBanks: () => Promise<void>;
     refetch: () => Promise<void>;
 }
 
-export function useWallet(): UseWalletReturn {
+export function useWallet({ includeBanks = false }: { includeBanks?: boolean } = {}): UseWalletReturn {
     const [wallet, setWallet] = useState<WalletData | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [banks, setBanks] = useState<Bank[]>([]);
@@ -71,7 +73,6 @@ export function useWallet(): UseWalletReturn {
             if (walletRes.success && walletRes.data) {
                 setWallet({
                     ...walletRes.data,
-                    currency: 'NGN',
                 });
             }
 
@@ -90,56 +91,14 @@ export function useWallet(): UseWalletReturn {
                 }));
                 setTransactions(mappedTransactions);
 
-                // Verify all pending gift/tip transactions
-                const pendingGifts = mappedTransactions.filter(
-                    (t) => t.status === 'pending' && t.type === 'tip' && t.reference
-                );
-                let anyCompleted = false;
-                for (const t of pendingGifts) {
-                    try {
-                        const verifyRes = await giftApi.verifyGift(t.reference!);
-                        if (verifyRes.success && verifyRes.data?.status === 'completed') {
-                            anyCompleted = true;
-                        }
-                    } catch {
-                        // Silently ignore verify errors
-                    }
-                }
-                if (anyCompleted) {
-                    // Refetch wallet and transactions
-                    const [refetchWallet, refetchTx] = await Promise.all([
-                        walletApi.getBalance(),
-                        walletApi.getTransactions({ limit: 10 }),
-                    ]);
-                    if (refetchWallet.success && refetchWallet.data) {
-                        setWallet({
-                            ...refetchWallet.data,
-                            currency: 'NGN',
-                        });
-                    }
-                    if (refetchTx.success && refetchTx.data && Array.isArray(refetchTx.data)) {
-                        setTransactions(refetchTx.data.map((t: any) => ({
-                            id: t.id.toString(),
-                            type: t.type === 'gift' ? 'tip' : (t.type === 'withdrawal' ? 'withdrawal' : 'payment'),
-                            amount: typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount,
-                            currency: t.currency,
-                            description: t.description || '',
-                            status: t.status as 'completed' | 'pending' | 'failed',
-                            createdAt: t.created_at,
-                            reference: t.reference,
-                            sender_name: t.sender_name || undefined,
-                            sender_email: t.sender_email || undefined,
-                        })));
-                    }
-                }
             } else {
                 setTransactions([]);
             }
 
             if (bankAccountRes.success && bankAccountRes.data) {
-                const accountData = bankAccountRes.data as any;
+                const accountData = bankAccountRes.data;
                 if (accountData.account_number || accountData.account_name) {
-                    setBankAccountState(accountData as BankAccount);
+                    setBankAccountState(accountData);
                 } else {
                     setBankAccountState(null);
                 }
@@ -165,12 +124,12 @@ export function useWallet(): UseWalletReturn {
     }, []);
 
     useEffect(() => {
-        fetchWallet();
-        fetchBanks();
-    }, [fetchWallet, fetchBanks]);
+        void fetchWallet();
+        if (includeBanks) void fetchBanks();
+    }, [fetchWallet, fetchBanks, includeBanks]);
 
-    const withdraw = useCallback(async (amount: number) => {
-        const response = await walletApi.withdraw(amount);
+    const withdraw = useCallback(async (amount: number, currency: 'NGN' | 'USD', password: string) => {
+        const response = await walletApi.withdraw(amount, currency, password);
         if (response.success) {
             await fetchWallet();
         } else {
@@ -208,6 +167,7 @@ export function useWallet(): UseWalletReturn {
         withdraw,
         setBankAccount,
         resolveAccount,
+        loadBanks: fetchBanks,
         refetch: fetchWallet,
     };
 }

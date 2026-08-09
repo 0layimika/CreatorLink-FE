@@ -6,7 +6,9 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 export function ThemeFloatingToggle() {
   const pathname = usePathname();
 
-  if (pathname.startsWith('/dashboard')) return null;
+  // Creator pages own their appearance. Keep this LinkVerse-level control on
+  // the marketing homepage; authenticated/auth screens provide their own.
+  if (pathname !== '/') return null;
 
   return (
     <div className="fixed bottom-4 left-4 z-40">

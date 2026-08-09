@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { storeApi } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
 
 function StorePaymentContent() {
   const searchParams = useSearchParams();
@@ -19,6 +20,7 @@ function StorePaymentContent() {
   const [downloadTokens, setDownloadTokens] = useState<Array<{ token: string; product_id?: number | null }>>([]);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [order, setOrder] = useState<any>(null);
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -29,11 +31,18 @@ function StorePaymentContent() {
       }
 
       try {
-        const response = await storeApi.verifyPurchase(reference);
+        let response: any;
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          response = await storeApi.verifyPurchase(reference);
+          if (response?.data?.status !== 'pending') break;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
         if (response.success && response.data) {
           const payload: any = response.data;
             if (payload.status === 'paid') {
               setStatus('success');
+              const orderResponse = await storeApi.getOrder(reference);
+      if (orderResponse.success) setOrder((orderResponse.data as any)?.order || orderResponse.data);
               if (payload.download_token) {
                 setDownloadToken(payload.download_token);
               }
@@ -105,9 +114,8 @@ function StorePaymentContent() {
               <h2 className="text-2xl font-bold text-foreground mb-2">
                 Payment Successful
               </h2>
-              <p className="text-sm text-text-secondary mb-6">
-                Your order has been confirmed.
-              </p>
+              <p className="text-sm text-text-secondary mb-6">Your order has been confirmed.</p>
+              {order && <div className="mb-6 rounded-2xl border border-border bg-background p-4 text-left text-sm"><div className="flex items-start justify-between gap-4 border-b border-border pb-3"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-text-secondary">Order receipt</p><p className="mt-1 break-all font-mono text-xs font-bold">{order.reference || reference}</p></div><span className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-black text-success">Paid</span></div>{Array.isArray(order.items) && order.items.length > 0 && <div className="space-y-2 border-b border-border py-3">{order.items.map((item: any) => <div key={item.id || `${item.product_id}-${item.title_snapshot}`} className="flex justify-between gap-4"><span>{item.title_snapshot || item.title} × {item.quantity}</span><span className="shrink-0 font-semibold">{formatCurrency(Number(item.line_total || 0), order.currency || 'NGN')}</span></div>)}</div>}<div className="space-y-2 py-3"><div className="flex justify-between"><span className="text-text-secondary">Subtotal</span><span>{formatCurrency(Number(order.subtotal || 0), order.currency || 'NGN')}</span></div><div className="flex justify-between"><span className="text-text-secondary">Platform fee</span><span>{formatCurrency(Number(order.platform_fee) > 0 ? order.platform_fee : Number(order.platform_fee_minor || 0) / 100, order.currency || 'NGN')}</span></div><div className="flex justify-between border-t border-border pt-2 text-base font-black"><span>Total</span><span>{formatCurrency(Number(order.total || order.amount || 0), order.currency || 'NGN')}</span></div></div>{order.buyer_name && <div className="border-t border-border pt-3 text-xs text-text-secondary"><p>Delivered to</p><p className="mt-1 font-semibold text-foreground">{order.buyer_name}</p>{order.delivery_address?.address && <p className="mt-1">{order.delivery_address.address}</p>}</div>}</div>}
               {downloadToken && (
                 <Button onClick={() => { void handleDownload(); }} disabled={downloadLoading} className="w-full shadow-soft">
                   {downloadLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
