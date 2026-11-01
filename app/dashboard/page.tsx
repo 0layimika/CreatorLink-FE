@@ -12,6 +12,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { useToast } from '@/contexts/ToastContext';
 import { API_BASE_URL } from '@/lib/api';
 import { formatCurrency, formatNumber } from '@/lib/utils';
+import { isCredit } from '@/lib/money';
 
 export default function DashboardPage() {
   const { user, creator } = useAuth();
@@ -110,7 +111,7 @@ export default function DashboardPage() {
         <MetricCard label="Profile views" value={formatNumber(overview?.totalViews || 0)} change={overview?.viewsChange} icon={Eye} tone="white" />
         <MetricCard label="Unique visitors" value={formatNumber(overview?.uniqueVisitors || 0)} note="This week" icon={UserRound} tone="pink" />
         <MetricCard label="Link clicks" value={formatNumber(overview?.totalClicks || 0)} change={overview?.clicksChange} icon={MousePointer2} tone="lime" />
-        <MetricCard label="Available balance" value={formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')} note={`${formatCurrency(wallet?.pending || 0, wallet?.currency || 'NGN')} pending`} icon={Wallet} tone="ink" />
+        <article className="flex flex-col justify-between gap-4 rounded-[28px] border border-ink bg-ink p-5 text-white"><div className="flex justify-between text-xs font-black uppercase tracking-[0.13em] text-white/65">Your wallets<Wallet className="h-5 w-5" /></div>{(['NGN', 'USD'] as const).map((currency) => { const balance = wallet?.wallets.find((entry) => entry.currency === currency); return <div key={currency}><p className="text-xs text-white/65">{currency} · Available to withdraw</p><p className="text-2xl font-black">{formatCurrency(balance?.balance ?? 0, currency)}</p><p className="mt-1 text-xs text-white/65">{formatCurrency(balance?.pending_balance ?? 0, currency)} pending settlement</p></div>; })}</article>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -129,8 +130,8 @@ export default function DashboardPage() {
           {transactions.length ? (
             <div className="divide-y divide-border">
               {transactions.slice(0, 5).map((transaction) => {
-                const incoming = transaction.type !== 'withdrawal';
-                return <div key={transaction.id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"><div className="min-w-0"><p className="truncate text-sm font-extrabold text-foreground">{transaction.description || (incoming ? 'Payment received' : 'Withdrawal')}</p><p className="mt-1 text-xs text-text-secondary">{new Date(transaction.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })} · {transaction.status}</p></div><p className={`shrink-0 text-sm font-black ${incoming ? 'text-success' : 'text-foreground'}`}>{incoming ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency)}</p></div>;
+                const incoming = isCredit(transaction.type);
+                return <div key={transaction.id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"><div className="min-w-0"><p className="truncate text-sm font-extrabold text-foreground">{transaction.description || (incoming ? 'Payment received' : transaction.type === 'fee' ? 'Fee' : 'Withdrawal')}</p><p className="mt-1 text-xs text-text-secondary">{new Date(transaction.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })} · {transaction.status}</p></div><p className={`shrink-0 text-sm font-black ${incoming ? 'text-success' : 'text-foreground'}`}>{incoming ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency)}</p></div>;
               })}
             </div>
           ) : <EmptyState icon={ShoppingBag} title="No money activity yet" description="Gifts, store sales and withdrawals will show up here as they happen." actionHref="/dashboard/store" actionLabel="Set up your store" />}

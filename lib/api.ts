@@ -1,4 +1,5 @@
 import type { SocialLink, StoreProduct } from '@/types';
+import type { Currency, HistoryParams, Wallet, WalletBalanceResponse, WalletTransaction, WithdrawalQuote, WithdrawalResult } from '@/types/wallet';
 
 const getDefaultApiBaseUrl = () => {
     if (typeof window !== 'undefined') {
@@ -150,12 +151,13 @@ class ApiClient {
         }
     }
 
-    async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-        return this.request<T>(endpoint, { method: 'GET' });
+    async get<T>(endpoint: string, options: Pick<RequestInit, 'signal'> = {}): Promise<ApiResponse<T>> {
+        return this.request<T>(endpoint, { ...options, method: 'GET' });
     }
 
-    async post<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
+    async post<T>(endpoint: string, body?: unknown, options: Pick<RequestInit, 'signal'> = {}): Promise<ApiResponse<T>> {
         return this.request<T>(endpoint, {
+            ...options,
             method: 'POST',
             body: body instanceof FormData ? body : JSON.stringify(body),
         });
@@ -268,32 +270,16 @@ export const analyticsApi = {
 
 // Wallet API
 export const walletApi = {
-    getWallet: () => api.get<{
-        id: string;
-        balance: number;
-        pending_balance: number;
-        currency: string;
-    }>('/wallet'),
+    getWallet: () => api.get<{ wallet: Wallet; wallets: Wallet[] }>('/wallet'),
 
-    getBalance: () => api.get<{ balance: number; pending: number; currency: string; wallets?: Array<{ id: number; balance: number; currency: string }> }>('/wallet/balance'),
+    getBalance: () => api.get<WalletBalanceResponse>('/wallet/balance'),
 
-    getTransactions: (params?: { page?: number; limit?: number }) => {
-        const queryParams = new URLSearchParams();
-        if (params?.page) queryParams.append('page', params.page.toString());
-        if (params?.limit) queryParams.append('limit', params.limit.toString());
-        const query = queryParams.toString();
-        return api.get<Array<{
-            id: number;
-            type: string;
-            amount: string | number;
-            currency: string;
-            description: string | null;
-            status: string;
-            reference: string;
-            sender_name: string | null;
-            sender_email: string | null;
-            created_at: string;
-        }>>(`/wallet/transactions${query ? `?${query}` : ''}`);
+    getTransactions: (params: HistoryParams = {}, signal?: AbortSignal) => {
+        const query = new URLSearchParams();
+        if (params.type) query.set('type', params.type);
+        if (params.limit !== undefined) query.set('limit', String(params.limit));
+        if (params.offset !== undefined) query.set('offset', String(params.offset));
+        return api.get<WalletTransaction[]>(`/wallet/transactions?${query}`, { signal });
     },
 
     getBanks: () => api.get<Array<{ code: string; name: string }>>('/wallet/banks'),
@@ -314,10 +300,18 @@ export const walletApi = {
         provider: string | null;
     }>('/wallet/bank-account'),
 
-    withdraw: (amount: number, currency: 'NGN' | 'USD' = 'NGN', password: string) =>
-        api.post('/wallet/withdraw', { amount, currency, password }),
+    quoteWithdrawal: (amount: number, currency: Currency, signal?: AbortSignal) =>
+        api.post<WithdrawalQuote>('/wallet/withdraw/quote', { amount, currency }, { signal }),
 
-    getWithdrawals: () => api.get('/wallet/withdrawals'),
+    withdraw: (quote_id: string, password: string, signal?: AbortSignal) =>
+        api.post<WithdrawalResult>('/wallet/withdraw', { quote_id, password }, { signal }),
+
+    getWithdrawals: (params: Pick<HistoryParams, 'limit' | 'offset'> = {}, signal?: AbortSignal) => {
+        const query = new URLSearchParams();
+        if (params.limit !== undefined) query.set('limit', String(params.limit));
+        if (params.offset !== undefined) query.set('offset', String(params.offset));
+        return api.get<WalletTransaction[]>(`/wallet/withdrawals?${query}`, { signal });
+    },
 };
 
 // Profile API (public)
@@ -543,6 +537,11 @@ export const giftApi = {
             authorization_url: string;
             reference: string;
             transaction_id: number;
+            gift_amount: number;
+            fee_amount: number;
+            fee_percent: number;
+            net_amount: number;
+            currency: Currency;
         }>(`/gift/${data.creatorUsername}`, {
             amount: data.amount,
             currency: data.currency || 'NGN',
@@ -551,10 +550,10 @@ export const giftApi = {
             description: data.description,
         }),
 
-    verifyGift: (reference: string) =>
+    verifyGift: (reference: string, signal?: AbortSignal) =>
         api.get<{
-            status: 'completed' | 'pending' | 'failed';
-        }>(`/gift/verify?reference=${reference}`),
+            status: 'completed' | 'pending';
+        }>(`/gift/verify?reference=${encodeURIComponent(reference)}`, { signal }),
 };
 
 // Store API

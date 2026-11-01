@@ -2,25 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { walletApi } from '@/lib/api';
+import type { Transaction } from '@/types';
+import type { Currency } from '@/types/wallet';
+import { mapTransaction, moneyNumber } from '@/lib/money';
 
 interface WalletData {
-    balance: number;
-    pending: number;
-    currency: string;
-    wallets?: Array<{ id: number; balance: number; currency: string }>;
-}
-
-interface Transaction {
-    id: string;
-    type: string;
-    amount: number;
-    currency: string;
-    description: string;
-    status: string;
-    createdAt: string;
-    reference?: string;
-    sender_name?: string;
-    sender_email?: string;
+    wallets: Array<{ id: number; balance: number; pending_balance: number; currency: Currency }>;
 }
 
 interface Bank {
@@ -45,7 +32,6 @@ interface UseWalletReturn {
     bankAccount: BankAccount | null;
     isLoading: boolean;
     error: string | null;
-    withdraw: (amount: number, currency: 'NGN' | 'USD', password: string) => Promise<void>;
     setBankAccount: (data: { account_number: string; bank_code: string; account_name: string }) => Promise<void>;
     resolveAccount: (accountNumber: string, bankCode: string) => Promise<{ account_name: string }>;
     loadBanks: () => Promise<void>;
@@ -61,7 +47,6 @@ export function useWallet({ includeBanks = false }: { includeBanks?: boolean } =
     const [error, setError] = useState<string | null>(null);
 
     const fetchWallet = useCallback(async () => {
-        setIsLoading(true);
         setError(null);
         try {
             const [walletRes, transactionsRes, bankAccountRes] = await Promise.all([
@@ -72,24 +57,15 @@ export function useWallet({ includeBanks = false }: { includeBanks?: boolean } =
 
             if (walletRes.success && walletRes.data) {
                 setWallet({
-                    ...walletRes.data,
+                    wallets: (walletRes.data.wallets ?? [{
+                        id: 0, currency: 'NGN' as const, balance: walletRes.data.balance,
+                        pending_balance: walletRes.data.pending_balance,
+                    }]).map((entry) => ({ ...entry, balance: moneyNumber(entry.balance), pending_balance: moneyNumber(entry.pending_balance) })),
                 });
             }
 
             if (transactionsRes.success && transactionsRes.data && Array.isArray(transactionsRes.data)) {
-                const mappedTransactions: Transaction[] = transactionsRes.data.map((t) => ({
-                    id: t.id.toString(),
-                    type: t.type === 'gift' ? 'tip' : (t.type === 'withdrawal' ? 'withdrawal' : 'payment'),
-                    amount: typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount,
-                    currency: t.currency,
-                    description: t.description || '',
-                    status: t.status as 'completed' | 'pending' | 'failed',
-                    createdAt: t.created_at,
-                    reference: t.reference,
-                    sender_name: t.sender_name || undefined,
-                    sender_email: t.sender_email || undefined,
-                }));
-                setTransactions(mappedTransactions);
+                setTransactions(transactionsRes.data.map(mapTransaction));
 
             } else {
                 setTransactions([]);
@@ -128,13 +104,15 @@ export function useWallet({ includeBanks = false }: { includeBanks?: boolean } =
         if (includeBanks) void fetchBanks();
     }, [fetchWallet, fetchBanks, includeBanks]);
 
-    const withdraw = useCallback(async (amount: number, currency: 'NGN' | 'USD', password: string) => {
-        const response = await walletApi.withdraw(amount, currency, password);
-        if (response.success) {
-            await fetchWallet();
-        } else {
-            throw new Error(response.message || 'Failed to initiate withdrawal');
-        }
+    useEffect(() => {
+        const onFocus = () => { void fetchWallet(); };
+        const onVisible = () => { if (document.visibilityState === 'visible') onFocus(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
     }, [fetchWallet]);
 
     const setBankAccount = useCallback(async (data: { account_number: string; bank_code: string; account_name: string }) => {
@@ -164,7 +142,6 @@ export function useWallet({ includeBanks = false }: { includeBanks?: boolean } =
         bankAccount,
         isLoading,
         error,
-        withdraw,
         setBankAccount,
         resolveAccount,
         loadBanks: fetchBanks,

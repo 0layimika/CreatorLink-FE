@@ -1,23 +1,25 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { moneyNumber } from '@/lib/money';
+import type { Money } from '@/types/wallet';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = 'NGN'): string {
+export function formatCurrency(amount: Money, currency: string = 'NGN'): string {
   const formatter = new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency,
     minimumFractionDigits: currency === 'USD' ? 2 : 0,
-    maximumFractionDigits: currency === 'USD' ? 2 : 0,
+    maximumFractionDigits: 2,
   });
 
   if (currency === 'NGN') {
-    return `₦${amount.toLocaleString()}`;
+    return `₦${moneyNumber(amount).toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
   }
 
-  return formatter.format(amount);
+  return formatter.format(moneyNumber(amount));
 }
 
 export function formatNumber(num: number | null | undefined): string {

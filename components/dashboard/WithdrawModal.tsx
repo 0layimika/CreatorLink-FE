@@ -1,167 +1,278 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { formatCurrency } from '@/lib/utils';
+import { ApiError, walletApi } from '@/lib/api';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { isMoneyInput, validMoneyAmount } from '@/lib/money';
+import { findWithdrawal, quoteIsCurrent } from '@/lib/withdrawals';
+import type { Currency, WithdrawalQuote, WithdrawalResult } from '@/types/wallet';
 
 interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onWithdraw: (amount: number, currency: 'NGN' | 'USD', password: string) => Promise<void>;
-  wallets: Array<{ balance: number; currency: 'NGN' | 'USD' }>;
+  onRefresh: () => Promise<void>;
+  onHasOutcomeChange: (hasOutcome: boolean) => void;
+  onAddBank: () => void;
+  bankKey: string;
+  hasBank: boolean;
+  wallets: Array<{ balance: number; currency: Currency }>;
+  recoveryKey: string;
 }
 
-export function WithdrawModal({
-  isOpen,
-  onClose,
-  onWithdraw,
-  wallets,
-}: WithdrawModalProps) {
+type Outcome = { quote: WithdrawalQuote; result?: WithdrawalResult; uncertain: boolean };
+
+export function WithdrawModal({ isOpen, onClose, onRefresh, onHasOutcomeChange, onAddBank, bankKey, hasBank, wallets, recoveryKey }: WithdrawModalProps) {
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [currency, setCurrency] = useState<Currency>('NGN');
   const [password, setPassword] = useState('');
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  useEffect(() => { if (isOpen) { setStep(1); setAmount(''); setPassword(''); setError(null); } }, [isOpen]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<'amount' | 'review' | 'password'>('amount');
+  const [quote, setQuote] = useState<WithdrawalQuote | null>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState<number | null>(null);
+  const [pollRound, setPollRound] = useState(0);
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [pollFinished, setPollFinished] = useState(false);
+  const requestVersion = useRef(0);
+  const quoteRequest = useRef<AbortController | null>(null);
+  const sending = useRef(false);
+  const refreshRef = useRef(onRefresh);
+  const bankRef = useRef(bankKey);
+  const outcomeRef = useRef(outcome);
+  const hasOutcome = outcome !== null;
+  useEffect(() => { onHasOutcomeChange(hasOutcome); }, [hasOutcome, onHasOutcomeChange]);
+  useEffect(() => { refreshRef.current = onRefresh; }, [onRefresh]);
+  useEffect(() => { outcomeRef.current = outcome; }, [outcome]);
 
-  if (!isOpen) return null;
-
-  const selectedWallet = wallets.find((wallet) => wallet.currency === currency);
-  const availableBalance = selectedWallet?.balance || 0;
-  const minimumAmount = currency === 'USD' ? 1 : 1000;
-
-  const handleWithdraw = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const withdrawAmount = parseFloat(amount);
-    
-    if (!amount || isNaN(withdrawAmount)) {
-      setError('Please enter a valid amount');
-      return;
-    }
-
-    if (withdrawAmount < minimumAmount) {
-      setError(`Minimum withdrawal amount is ${formatCurrency(minimumAmount, currency)}`);
-      return;
-    }
-
-    if (withdrawAmount > availableBalance) {
-      setError('Insufficient balance');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
+  useEffect(() => {
     try {
-      if (!password) { setError('Enter your password to confirm this withdrawal'); return; }
-      await onWithdraw(withdrawAmount, currency, password);
-      setAmount('');
+      const saved = sessionStorage.getItem(recoveryKey);
+      if (saved) {
+        const recovery: Outcome = JSON.parse(saved);
+        if (recovery.quote?.quote_id && (recovery.uncertain || recovery.result?.status === 'pending')) setOutcome(recovery);
+      }
+    } catch { /* Recovery storage is optional. */ }
+  }, [recoveryKey]);
+
+  const remember = (value: Outcome | null) => {
+    outcomeRef.current = value;
+    setOutcome(value);
+    try {
+      if (value && (value.uncertain || value.result?.status === 'pending')) sessionStorage.setItem(recoveryKey, JSON.stringify(value));
+      else sessionStorage.removeItem(recoveryKey);
+    } catch { /* Keep recovery in memory if browser storage is unavailable. */ }
+  };
+  const rememberRef = useRef(remember);
+  useEffect(() => { rememberRef.current = remember; });
+
+  const invalidate = useCallback(() => {
+    requestVersion.current += 1;
+    quoteRequest.current?.abort();
+    setQuote(null);
+    setPassword('');
+    setStep('amount');
+    setError(null);
+    setBusy(false);
+  }, []);
+
+  useEffect(() => {
+    if (bankRef.current !== bankKey) {
+      bankRef.current = bankKey;
+      // An in-flight payout keeps its original quote and bank for recovery.
+      if (!outcomeRef.current && !sending.current) invalidate();
+    }
+  }, [bankKey, invalidate]);
+
+  useEffect(() => {
+    if (!isOpen) {
       setPassword('');
-      onClose();
+      if (!outcomeRef.current && !sending.current) invalidate();
+    }
+  }, [isOpen, invalidate]);
+
+  useEffect(() => {
+    if (!quote || outcome) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [quote, outcome]);
+
+  useEffect(() => () => { quoteRequest.current?.abort(); }, []);
+
+  const unresolved = outcome?.uncertain || outcome?.result?.status === 'pending';
+  const identity = unresolved && outcome ? `${outcome.quote.quote_id}:${outcome.result?.reference ?? ''}` : null;
+  useEffect(() => {
+    if (!identity || busy) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let canceled = false;
+    let attempts = 0;
+    setChecked(false);
+    setPollFinished(false);
+    const check = async () => {
+      setChecking(true);
+      try {
+        const current = outcomeRef.current;
+        if (!current) return;
+        const row = await findWithdrawal({ quote_id: current.quote.quote_id, transaction_id: current.result?.transaction_id, reference: current.result?.reference }, controller.signal);
+        if (canceled) return;
+        setChecked(true);
+        if (row) {
+          const result: WithdrawalResult = { ...current.quote, transaction_id: row.id, reference: row.reference, status: row.status };
+          rememberRef.current({ quote: current.quote, result, uncertain: false });
+          setError(null);
+          void refreshRef.current();
+          if (row.status !== 'pending') return;
+        }
+      } catch (err) {
+        if (!canceled) setError(err instanceof Error ? err.message : 'Could not check withdrawal status.');
+      } finally {
+        if (!canceled) setChecking(false);
+      }
+      if (canceled) return;
+      attempts += 1;
+      if (attempts < 7) timer = setTimeout(check, Math.min(2000 * 2 ** attempts, 30000));
+      else setPollFinished(true);
+    };
+    void check();
+    return () => { canceled = true; controller.abort(); clearTimeout(timer); };
+  }, [identity, pollRound, busy]);
+
+  const availableBalance = wallets.find((entry) => entry.currency === currency)?.balance ?? 0;
+  const minimum = currency === 'USD' ? 1 : 1000;
+  const value = validMoneyAmount(amount);
+  const remaining = quote && now !== null ? Math.max(0, Math.ceil((Date.parse(quote.expires_at) - now) / 1000)) : 0;
+  const expired = !quote || now === null || !quoteIsCurrent(quote.expires_at, now);
+  const canQuote = value !== null && value >= minimum && hasBank;
+
+  const requestQuote = async () => {
+    if (sending.current || !canQuote) return;
+    invalidate();
+    const version = requestVersion.current;
+    const controller = new AbortController();
+    quoteRequest.current = controller;
+    setBusy(true);
+    try {
+      const response = await walletApi.quoteWithdrawal(value, currency, controller.signal);
+      if (version !== requestVersion.current) return;
+      if (!response.data) throw new Error('Could not create a withdrawal quote.');
+      setQuote(response.data);
+      setNow(Date.now());
+      setStep('review');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate withdrawal');
+      if (version === requestVersion.current && !controller.signal.aborted) setError(err instanceof Error ? err.message : 'Could not create a withdrawal quote.');
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) setBusy(false);
     }
   };
 
-  const presetAmounts = [
-    minimumAmount,
-    Math.min(10000, availableBalance),
-    Math.min(25000, availableBalance),
-    Math.min(50000, availableBalance),
-  ].filter((amt, index, arr) => amt >= minimumAmount && (index === 0 || amt !== arr[index - 1]));
+  const execute = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const activeQuote = outcome?.uncertain ? outcome.quote : quote;
+    if (sending.current || !activeQuote || !password) return;
+    if (!outcome?.uncertain && !quoteIsCurrent(activeQuote.expires_at)) {
+      setNow(Date.now());
+      setPassword('');
+      setError('This quote is too close to expiry. Refresh it and review the new figures.');
+      return;
+    }
+    if (!outcome?.uncertain && !activeQuote.sufficient_balance) return;
+    if (outcome?.uncertain && (!checked || checking)) return;
+    sending.current = true;
+    setBusy(true);
+    setError(null);
+    const accountPassword = password;
+    setPassword('');
+    // Save the quote before sending; a reload or lost response must not start a new payout.
+    const previousOutcome = outcome;
+    remember({ quote: activeQuote, uncertain: true });
+    setChecked(false);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await walletApi.withdraw(activeQuote.quote_id, accountPassword, controller.signal);
+      if (!response.data) throw new Error('The withdrawal response was incomplete. Checking history for its status.');
+      remember({ quote: activeQuote, result: response.data, uncertain: false });
+      setStep('review');
+    } catch (err) {
+      const definitiveRejection = err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408;
+      // A prior uncertain attempt may still exist even when this retry is rejected.
+      if (definitiveRejection && !previousOutcome?.uncertain) remember(null);
+      setError(controller.signal.aborted ? 'The request timed out. Checking withdrawal history before another attempt.' : err instanceof Error ? err.message : 'The withdrawal response was interrupted. Checking history before another attempt.');
+      setPollRound((round) => round + 1);
+    } finally {
+      window.clearTimeout(timeout);
+      sending.current = false;
+      setBusy(false);
+      void refreshRef.current();
+    }
+  };
+
+  const close = () => {
+    if (sending.current) return;
+    setPassword('');
+    if (!unresolved) { remember(null); invalidate(); setAmount(''); }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+  const displayQuote = outcome?.quote ?? quote;
+  const terminal = outcome?.result?.status === 'completed' || outcome?.result?.status === 'failed';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-card rounded-xl shadow-soft w-full max-w-md p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-text-secondary hover:text-foreground transition-colors"
-          disabled={isLoading}
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section role="dialog" aria-modal="true" aria-labelledby="withdraw-title" className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-card p-6 shadow-soft">
+        <button type="button" aria-label="Close withdrawal" onClick={close} disabled={busy} className="absolute right-4 top-4 text-text-secondary disabled:opacity-50"><X className="h-5 w-5" /></button>
+        <h2 id="withdraw-title" className="mb-2 text-xl font-black">Withdraw funds</h2>
+        <p className="mb-5 text-sm text-text-secondary">{outcome ? 'Withdrawal status' : step === 'amount' ? 'Choose an amount to get a quote.' : step === 'review' ? 'Review your quote before confirming.' : 'Confirm the reviewed quote with your password.'}</p>
 
-        <h2 className="text-xl font-bold text-foreground mb-2">Withdraw Funds</h2>
-        <p className="mb-6 text-sm text-text-secondary">Step {step} of 3</p>
+        {!outcome && step === 'amount' && <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">{(['NGN', 'USD'] as const).map((item) => <button type="button" disabled={busy} key={item} onClick={() => { invalidate(); setCurrency(item); setAmount(''); }} className={`rounded-xl border p-3 text-left ${currency === item ? 'border-primary bg-primary/10' : 'border-border'}`}><p className="text-xs font-black">{item} wallet</p><p className="mt-1 font-bold">{formatCurrency(wallets.find((wallet) => wallet.currency === item)?.balance ?? 0, item)}</p><p className="mt-1 text-xs text-text-secondary">Available to withdraw</p></button>)}</div>
+          <Input label={`Amount (${currency})`} inputMode="decimal" value={amount} disabled={busy} onChange={(event) => { if (isMoneyInput(event.target.value)) { invalidate(); setAmount(event.target.value); } }} helperText={`Minimum ${formatCurrency(minimum, currency)}. The quoted fee is added to your wallet debit.`} error={amount && (value === null || value < minimum) ? `Enter at least ${formatCurrency(minimum, currency)}, with up to two decimal places.` : undefined} />
+          <p className="text-xs text-text-secondary">Available balance: {formatCurrency(availableBalance, currency)}. Pending funds cannot be withdrawn.</p>
+          {!hasBank && <div className="rounded-xl border border-border p-4"><p className="mb-3 text-sm">Add your Nigerian bank account to receive withdrawals from either wallet.</p><Button type="button" onClick={onAddBank}>Add bank account</Button></div>}
+          <Button type="button" className="w-full" disabled={!canQuote} isLoading={busy} onClick={() => void requestQuote()}>Get withdrawal quote</Button>
+        </div>}
 
-        <div className="mb-6 p-4 rounded-lg bg-card/50 border border-border">
-          {step === 1 ? <><p className="text-sm font-semibold text-text-secondary">Which wallet are you withdrawing from?</p><div className="mt-3 grid gap-3">{(['NGN', 'USD'] as const).map((walletCurrency) => { const wallet = wallets.find((item) => item.currency === walletCurrency); return <button key={walletCurrency} type="button" onClick={() => { setCurrency(walletCurrency); setAmount(''); setStep(2); }} className={`rounded-xl border p-4 text-left transition ${currency === walletCurrency ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}><p className="text-xs font-black uppercase tracking-[0.12em] text-text-secondary">{walletCurrency} wallet</p><p className="mt-1 text-xl font-black">{formatCurrency(wallet?.balance ?? 0, walletCurrency)}</p></button>; })}</div></> : <><p className="text-sm text-text-secondary mb-1">Available balance</p><p className="text-2xl font-bold text-foreground">{formatCurrency(availableBalance, currency)}</p></>}
-        </div>
-
-        <form onSubmit={handleWithdraw} className="space-y-4">
-          {step === 2 && <div className="grid grid-cols-2 gap-3">
-            {presetAmounts.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setAmount(preset.toString())}
-                disabled={isLoading || preset > availableBalance}
-                className={`p-3 rounded-lg border text-center font-medium transition-all ${
-                  amount === preset.toString()
-                    ? 'border-primary bg-primary/10 text-primary shadow-soft'
-                    : preset > availableBalance
-                    ? 'border-border/50 text-text-secondary opacity-50 cursor-not-allowed'
-                    : 'border-border text-foreground hover:border-primary/50'
-                }`}
-              >
-                {formatCurrency(preset, currency)}
-              </button>
-            ))}
-          </div>}
-
-          {step === 2 && <Input
-            type="number"
-            label="Amount"
-            placeholder={`Enter amount (min: ${formatCurrency(minimumAmount, currency)})`}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            min={minimumAmount}
-            max={availableBalance}
-            required
-            disabled={isLoading}
-          />}
-
-          {step === 3 && <>
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-text-secondary">You’re withdrawing</p>
-              <p className="mt-1 text-2xl font-black text-foreground">{formatCurrency(parseFloat(amount) || 0, currency)}</p>
-              <p className="mt-1 text-sm text-text-secondary">from your {currency} wallet</p>
-            </div>
-            <Input type="password" label="Password" placeholder="Enter your password to confirm" value={password} onChange={(event) => setPassword(event.target.value)} required disabled={isLoading} />
+        {displayQuote && <div className="space-y-4">
+          <dl className="space-y-3 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+            {[
+              ['Withdrawal amount', formatCurrency(displayQuote.amount, displayQuote.currency)],
+              ['Withdrawal fee', formatCurrency(displayQuote.fee, displayQuote.fee_currency)],
+              ['Total wallet debit', formatCurrency(displayQuote.total_debit, displayQuote.currency)],
+              ['You receive in your bank', formatCurrency(displayQuote.receive_amount, displayQuote.receive_currency)],
+            ].map(([label, amount]) => <div key={label} className="flex justify-between gap-3"><dt className="text-text-secondary">{label}</dt><dd className="text-right font-bold">{amount}</dd></div>)}
+            {displayQuote.exchange_rate !== null && <div className="flex justify-between gap-3"><dt className="text-text-secondary">Exchange rate</dt><dd className="text-right font-bold">1 {displayQuote.currency} = {String(displayQuote.exchange_rate)} {displayQuote.receive_currency}</dd></div>}
+          </dl>
+          <div className="rounded-xl border border-border p-4 text-sm"><p className="font-bold">{displayQuote.bank_account.bank_name}</p><p className="text-text-secondary">{displayQuote.bank_account.account_name} · ****{displayQuote.bank_account.account_last_four}</p></div>
+          {!outcome && <>
+            <p className="text-xs text-text-secondary">Quote expires {formatDateTime(displayQuote.expires_at)} · {expired ? 'Expired or too close to expiry' : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')} remaining`}</p>
+            {!displayQuote.sufficient_balance && <p role="alert" className="text-sm text-error">Your available balance does not cover the amount plus fee. Pending funds do not count.</p>}
+            {expired ? <Button type="button" className="w-full" isLoading={busy} onClick={() => void requestQuote()}>Refresh quote</Button> : step === 'review' && <Button type="button" className="w-full" disabled={!displayQuote.sufficient_balance || busy} onClick={() => { setStep('password'); setError(null); }}>Continue to password confirmation</Button>}
+            <Button type="button" variant="outline" disabled={busy} onClick={invalidate}>Edit amount or currency</Button>
           </>}
+        </div>}
 
-          {error && (
-            <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
-              {error}
-            </div>
-          )}
+        {outcome && <div className="mt-5 space-y-3" aria-live="polite">
+          <p className={`font-bold ${outcome.result?.status === 'failed' ? 'text-error' : 'text-foreground'}`}>{outcome.result?.status === 'completed' ? 'Withdrawal completed' : outcome.result?.status === 'failed' ? 'Withdrawal failed' : outcome.uncertain ? 'Confirming withdrawal status' : 'Withdrawal processing'}</p>
+          <p className="text-sm text-text-secondary">{outcome.result?.status === 'completed' ? 'Your payout has completed.' : outcome.result?.status === 'failed' ? 'The backend refunds the amount and fee to your available balance. Your wallet has been refreshed.' : outcome.uncertain ? 'The response was uncertain. We’re checking history for this quote. A missing entry does not mean the withdrawal failed.' : 'The amount plus fee has been debited. Bank delivery is still processing.'}</p>
+          {outcome.result?.reference && <p className="break-all text-xs text-text-secondary">Reference: {outcome.result.reference}</p>}
+          {unresolved && <><p className="text-xs text-text-secondary">{checking ? 'Checking withdrawal history…' : pollFinished ? 'Automatic checks paused. Check again for an update.' : 'Status checks continue in the background.'}</p><Button type="button" variant="outline" disabled={busy || checking} onClick={() => { setChecked(false); setPollRound((round) => round + 1); }}>Check status</Button></>}
+          {outcome.uncertain && checked && !checking && !busy && <p className="text-xs text-text-secondary">You can confirm again using this same quote. The backend reuses any existing payout.</p>}
+          {terminal && <Button type="button" className="w-full" onClick={close}>Done</Button>}
+        </div>}
 
-          <div className="flex space-x-3 pt-4">
-            {step === 2 && <>
-              <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isLoading} className="flex-1">Back</Button>
-              <Button type="button" onClick={() => setStep(3)} disabled={!amount || parseFloat(amount) < minimumAmount || parseFloat(amount) > availableBalance} className="flex-1">Continue</Button>
-            </>}
-            {step === 3 && <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-              className="flex-1"
-            >
-              Cancel
-            </Button>}
-            {step === 3 && <Button type="submit" disabled={isLoading || !amount || !password || parseFloat(amount) < minimumAmount || parseFloat(amount) > availableBalance} className="flex-1">
-              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</> : 'Withdraw'}
-            </Button>}
-          </div>
-        </form>
-      </div>
+        {((!outcome && step === 'password' && !expired) || (outcome?.uncertain && checked && !checking)) && <form onSubmit={execute} className="mt-5 space-y-4">
+          <Input type="password" label="Account password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} />
+          <Button type="submit" className="w-full" disabled={!password || (!outcome && !quote?.sufficient_balance)} isLoading={busy}>{outcome ? 'Confirm again with the same quote' : 'Confirm withdrawal'}</Button>
+          {!outcome && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setPassword(''); setStep('review'); }}>Back to quote</Button>}
+        </form>}
+        {error && <div role="alert" className="mt-4 rounded-xl border border-error/20 bg-error/10 p-3 text-sm text-error">{error}{!outcome && quote && <Button type="button" variant="ghost" className="mt-2" disabled={busy} onClick={() => void requestQuote()}>Get a fresh quote to review</Button>}</div>}
+      </section>
     </div>
   );
 }

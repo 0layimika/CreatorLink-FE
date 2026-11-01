@@ -83,7 +83,7 @@ export interface Stats {
 
 export interface Transaction {
   id: string;
-  type: 'tip' | 'withdrawal' | 'payment';
+  type: 'tip' | 'withdrawal' | 'payment' | 'fee';
   amount: number;
   currency: string;
   description: string;
@@ -93,6 +93,7 @@ export interface Transaction {
   reference?: string;
   sender_name?: string;
   sender_email?: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface Activity {
