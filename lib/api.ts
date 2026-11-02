@@ -552,7 +552,7 @@ export const giftApi = {
 
     verifyGift: (reference: string, signal?: AbortSignal) =>
         api.get<{
-            status: 'completed' | 'pending';
+            status: 'completed' | 'pending' | 'failed';
         }>(`/gift/verify?reference=${encodeURIComponent(reference)}`, { signal }),
 };
 
