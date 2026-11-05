@@ -83,7 +83,7 @@ export interface Stats {
 
 export interface Transaction {
   id: string;
-  type: 'tip' | 'withdrawal' | 'payment' | 'fee';
+  type: 'tip' | 'withdrawal' | 'payment' | 'fee' | 'admin_debit';
   amount: number;
   currency: string;
   description: string;

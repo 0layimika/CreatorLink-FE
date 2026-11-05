@@ -1,7 +1,7 @@
 export type Currency = 'NGN' | 'USD';
 export type Money = string | number;
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
-export type TransactionType = 'gift' | 'withdrawal' | 'store' | 'fee';
+export type TransactionType = 'gift' | 'withdrawal' | 'store' | 'fee' | 'admin_debit';
 
 export interface Wallet {
   id: number;

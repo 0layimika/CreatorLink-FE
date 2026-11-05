@@ -62,6 +62,33 @@ test('fee rows remain debits and retain their source metadata', () => {
   assert.equal(isCredit('payment'), true);
 });
 
+test('admin debit rows display as debits in creator history', () => {
+  const { mapTransaction, isCredit } = loadModule('lib/money.ts');
+  const mapped = mapTransaction({ id: 12, type: 'admin_debit', amount: '4.25', currency: 'USD', status: 'completed', metadata: { reason: 'Correction' }, created_at: '2026-11-05T00:00:00Z' });
+  assert.equal(mapped.type, 'admin_debit');
+  assert.equal(mapped.amount, 4.25);
+  assert.equal(isCredit(mapped.type), false);
+});
+
+test('admin debits preserve decimal strings and retry IDs; list filters are encoded', async () => {
+  const requests = [];
+  const { api } = apiWithFetch(async (url, options) => {
+    requests.push({ url: new URL(url), method: options.method, body: options.body ? JSON.parse(options.body) : undefined });
+    return response({ success: true, data: {} });
+  });
+  const { adminApi } = loadModule('lib/admin-api.ts', { './api': { api } });
+  const body = { amount: '1.20', reason: 'Correction', request_id: 'b6f5cfcb-ef68-474e-8646-a56d18b1a3c5' };
+  await adminApi.debit(9, body);
+  await adminApi.debit(9, body);
+  assert.deepEqual(requests[0].body, body);
+  assert.deepEqual(requests[1].body, body);
+  assert.equal(requests[0].url.pathname, '/api/v1/admin/wallets/9/debit');
+  await adminApi.transactions({ search: 'name&currency=NGN', currency: 'USD', offset: 0, limit: 25 });
+  assert.equal(requests[2].url.searchParams.get('search'), 'name&currency=NGN');
+  assert.deepEqual(requests[2].url.searchParams.getAll('currency'), ['USD']);
+  assert.equal(requests[2].url.searchParams.get('offset'), '0');
+});
+
 test('withdrawals quote in major units and execute with only quote ID and password', async () => {
   const requests = [];
   const { walletApi } = apiWithFetch(async (url, options) => {

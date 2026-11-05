@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ExternalLink, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { adminApi } from '@/lib/admin-api';
+import { ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { BrandWordmark } from '@/components/ui/BrandWordmark';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -12,7 +14,13 @@ import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
   const { user, creator, logout } = useAuth();
+  useEffect(() => {
+    let active = true;
+    void adminApi.session().then(() => { if (active) setIsAdmin(true); }).catch(() => { if (active) setIsAdmin(false); });
+    return () => { active = false; };
+  }, [user?.id]);
   const displayName = `${creator?.first_name || ''} ${creator?.last_name || ''}`.trim() || creator?.username || 'Creator';
 
   return (
@@ -34,6 +42,7 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto space-y-1 pt-8">
+        {isAdmin && <Link href="/admin" className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-secondary hover:bg-white/8"><ShieldCheck className="h-5 w-5" />Admin dashboard</Link>}
         {creator?.username && (
           <Link href={`/${creator.username}`} target="_blank" className="mb-4 flex items-center justify-between rounded-2xl border border-white/15 bg-white/6 px-4 py-3 text-sm font-bold text-white hover:border-secondary/60">
             View public page <ExternalLink className="h-4 w-4 text-secondary" />

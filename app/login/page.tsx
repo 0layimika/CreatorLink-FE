@@ -24,7 +24,8 @@ export default function LoginPage() {
     setResendSuccess(false);
 
     try {
-      await login(formData.email.trim().toLowerCase(), formData.password);
+      const destination = new URLSearchParams(window.location.search).get('redirect') === '/admin' ? '/admin' : undefined;
+      await login(formData.email.trim().toLowerCase(), formData.password, destination);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'We could not log you in. Please try again.';
       const isUnverified = message.toLowerCase().includes('verify account') || message.toLowerCase().includes('please verify');

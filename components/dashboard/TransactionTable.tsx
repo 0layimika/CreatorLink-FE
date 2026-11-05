@@ -18,6 +18,7 @@ const typeIcons = {
   withdrawal: ArrowUpRight,
   payment: CreditCard,
   fee: Receipt,
+  admin_debit: ArrowUpRight,
 };
 
 const typeLabels = {
@@ -25,6 +26,7 @@ const typeLabels = {
   withdrawal: 'Withdrawal',
   payment: 'Store sale',
   fee: 'Fee',
+  admin_debit: 'Admin debit',
 };
 
 const statusVariants = {
